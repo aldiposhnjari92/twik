@@ -33,7 +33,7 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": ["twik.appwrite.network", "localhost"]
             },
             "ssr": {
               "entry": "src/server.ts"
