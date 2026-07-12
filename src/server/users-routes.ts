@@ -16,12 +16,15 @@ interface UserDto {
   email: string;
   department: string | null;
   isAdmin: boolean;
+  createdAt: string;
 }
 
 function departmentOf(prefs: Record<string, unknown>): string | null {
   const value = prefs['department'];
   return typeof value === 'string' && DEPARTMENTS.includes(value) ? value : null;
 }
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const usersCache = new TtlCache<UserDto[]>(USERS_CACHE_TTL_MS);
 
@@ -49,6 +52,7 @@ export function registerUsersRoutes(app: Express): void {
         email: user.email,
         department: departmentOf(user.prefs),
         isAdmin: isAdmin(user),
+        createdAt: user.$createdAt,
       }));
       usersCache.set(dtos);
       res.json({ users: dtos });
@@ -79,7 +83,14 @@ export function registerUsersRoutes(app: Express): void {
       await users.updatePrefs({ userId: created.$id, prefs: { department } });
       await account.createRecovery({ email, url: `${originOf(req)}/reset-password` });
       usersCache.clear();
-      res.status(201).json({ id: created.$id, name: created.name, email: created.email, department, isAdmin: false });
+      res.status(201).json({
+        id: created.$id,
+        name: created.name,
+        email: created.email,
+        department,
+        isAdmin: false,
+        createdAt: created.$createdAt,
+      });
     } catch (error) {
       res.status(errorStatus(error)).json({
         message: error instanceof Error ? error.message : 'Could not invite teammate.',
@@ -90,21 +101,76 @@ export function registerUsersRoutes(app: Express): void {
   app.patch('/api/users/:id', async (req, res) => {
     if (!(await requireAdmin(req, res))) return;
 
-    const { department } = req.body ?? {};
-    if (!department || !DEPARTMENTS.includes(department)) {
+    const { name, email, department } = req.body ?? {};
+
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      res.status(400).json({ message: 'Enter a name.' });
+      return;
+    }
+    if (email !== undefined && (typeof email !== 'string' || !EMAIL_PATTERN.test(email))) {
+      res.status(400).json({ message: 'Enter a valid email address.' });
+      return;
+    }
+    if (department !== undefined && !DEPARTMENTS.includes(department)) {
       res.status(400).json({ message: 'Choose a valid department.' });
+      return;
+    }
+    if (name === undefined && email === undefined && department === undefined) {
+      res.status(400).json({ message: 'Nothing to update.' });
       return;
     }
 
     try {
       const { client } = createAdminClient();
       const users = new Users(client);
-      await users.updatePrefs({ userId: req.params.id, prefs: { department } });
+
+      if (name !== undefined) {
+        await users.updateName({ userId: req.params.id, name: name.trim() });
+      }
+      if (email !== undefined) {
+        await users.updateEmail({ userId: req.params.id, email });
+      }
+      if (department !== undefined) {
+        await users.updatePrefs({ userId: req.params.id, prefs: { department } });
+      }
+
       usersCache.clear();
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({
-        message: error instanceof Error ? error.message : 'Could not update department.',
+        message: error instanceof Error ? error.message : 'Could not update that teammate.',
+      });
+    }
+  });
+
+  app.delete('/api/users/:id', async (req, res) => {
+    const caller = await requireAdmin(req, res);
+    if (!caller) return;
+
+    if (req.params.id === caller.$id) {
+      res.status(400).json({ message: "You can't remove your own account from here. Use Settings → Danger zone instead." });
+      return;
+    }
+
+    try {
+      const { client } = createAdminClient();
+      const users = new Users(client);
+
+      const target = await users.get({ userId: req.params.id });
+      if (isAdmin(target)) {
+        const { total } = await users.list({ queries: [Query.equal('labels', ADMIN_LABEL), Query.limit(2)] });
+        if (total <= 1) {
+          res.status(400).json({ message: 'The workspace needs at least one admin.' });
+          return;
+        }
+      }
+
+      await users.delete({ userId: req.params.id });
+      usersCache.clear();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(errorStatus(error)).json({
+        message: error instanceof Error ? error.message : 'Could not remove that teammate.',
       });
     }
   });

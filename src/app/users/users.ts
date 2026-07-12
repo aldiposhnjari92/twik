@@ -20,12 +20,19 @@ export interface WorkspaceUser {
   email: string;
   department: Department | null;
   isAdmin: boolean;
+  createdAt: string;
 }
 
 export interface InviteInput {
   name: string;
   email: string;
   department: Department;
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  department?: Department;
 }
 
 async function readError(response: Response, fallback: string): Promise<string> {
@@ -80,6 +87,24 @@ export class Users {
     });
     if (!response.ok) {
       throw new Error(await readError(response, "Could not update that teammate's role."));
+    }
+  }
+
+  async update(id: string, input: UpdateUserInput): Promise<void> {
+    const response = await fetch(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new Error(await readError(response, 'Could not update that teammate.'));
+    }
+  }
+
+  async remove(id: string): Promise<void> {
+    const response = await fetch(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) {
+      throw new Error(await readError(response, 'Could not remove that teammate.'));
     }
   }
 }

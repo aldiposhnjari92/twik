@@ -31,7 +31,7 @@
     [first]="pageFirst()" (firstChange)="pageFirst.set($event)"
     [rowsPerPageOptions]="[10, 25, 50]" [globalFilterFields]="['name', 'email', 'departmentLabel']" sortMode="single"
     dataKey="id" [scrollable]="true" scrollHeight="32rem"
-    class="rounded-md border border-slate-200 overflow-hidden shadow-sm" [tableStyle]="{ 'min-width': '52rem' }"
+    class="rounded-md border border-slate-200 overflow-hidden shadow-sm" [tableStyle]="{ 'min-width': '68rem' }"
     [size]="'small'">
     <ng-template #header>
       <tr>
@@ -77,6 +77,7 @@
           </div>
         </th>
         <th style="width: 12rem"><span class="text-sm">Role</span></th>
+        <th style="width: 9rem"><span class="sr-only">Actions</span></th>
       </tr>
     </ng-template>
 
@@ -124,12 +125,32 @@
             }
           </div>
         </td>
+        <td>
+          <div class="flex items-center justify-end gap-1">
+            <button pButton type="button" text rounded severity="secondary" size="small" [fluid]="false"
+              [attr.aria-label]="'View ' + member.name" (click)="openDetails(member)">
+              <i class="pi pi-eye" pButtonIcon aria-hidden="true"></i>
+            </button>
+            @if (isAdmin()) {
+            <button pButton type="button" text rounded severity="secondary" size="small" [fluid]="false"
+              [attr.aria-label]="'Edit ' + member.name" (click)="openEditDialog(member)">
+              <i class="pi pi-pencil" pButtonIcon aria-hidden="true"></i>
+            </button>
+            }
+            @if (isAdmin() && !member.isYou) {
+            <button pButton type="button" text rounded severity="danger" size="small" [fluid]="false"
+              [attr.aria-label]="'Remove ' + member.name" (click)="confirmRemove(member)">
+              <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
+            </button>
+            }
+          </div>
+        </td>
       </tr>
     </ng-template>
 
     <ng-template #emptymessage>
       <tr>
-        <td colspan="6" class="p-0">
+        <td colspan="7" class="p-0">
           <app-empty-state icon="pi pi-users"
             [title]="rows().length === 0 ? 'No team members yet' : 'No teammates match your filters'"
             [description]="rows().length === 0 ? 'Invite teammates to start collaborating in your workspace.' : 'Try adjusting your search or filters.'" />
@@ -197,6 +218,118 @@
           Sending invite&hellip;
           } @else {
           Send invite
+          }
+        </button>
+      </div>
+    </form>
+  </p-fluid>
+</p-dialog>
+
+<p-dialog [visible]="detailsMember() !== null" (visibleChange)="!$event && closeDetails()" [modal]="true"
+  [style]="{ width: '28rem' }" [draggable]="false">
+  @if (detailsMember(); as member) {
+  <ng-template #header>
+    <div class="flex items-center gap-3">
+      <p-avatar [label]="member.initials" shape="circle" size="large"
+        [class]="member.avatarColor + ' text-white font-medium'" />
+      <div>
+        <p class="text-base font-semibold tracking-tight text-slate-900">{{ member.name }}</p>
+        <p class="text-xs text-slate-500">{{ member.email }}</p>
+      </div>
+    </div>
+  </ng-template>
+
+  <div class="space-y-5">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <p class="text-xs font-medium tracking-wide text-slate-400 uppercase">Department</p>
+        <p class="mt-1 text-sm text-slate-900">{{ member.departmentLabel }}</p>
+      </div>
+      <div>
+        <p class="text-xs font-medium tracking-wide text-slate-400 uppercase">Role</p>
+        <p class="mt-1 text-sm text-slate-900">{{ member.isAdmin ? 'Admin' : 'Member' }}</p>
+      </div>
+      <div>
+        <p class="text-xs font-medium tracking-wide text-slate-400 uppercase">Joined</p>
+        <p class="mt-1 text-sm text-slate-900">{{ member.createdAt | date: 'mediumDate' }}</p>
+      </div>
+      <div>
+        <p class="text-xs font-medium tracking-wide text-slate-400 uppercase">Projects</p>
+        <p class="mt-1 text-sm text-slate-900">{{ member.projectCount }}</p>
+      </div>
+    </div>
+
+    <div>
+      <p class="mb-2 text-xs font-medium tracking-wide text-slate-400 uppercase">Involved in</p>
+      @if (detailsProjects().length === 0) {
+      <p class="text-sm text-slate-500">Not involved in any projects yet.</p>
+      } @else {
+      <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-100">
+        @for (project of detailsProjects(); track project.id) {
+        <li class="flex items-center justify-between gap-3 px-3 py-2.5">
+          <a [routerLink]="['/projects', project.id, 'edit']" (click)="closeDetails()"
+            class="truncate text-sm font-medium text-blue-600 hover:text-blue-500">{{ project.name }}</a>
+          <p-tag [value]="project.memberRole" [severity]="project.memberRole === 'Owner' ? 'info' : 'secondary'" />
+        </li>
+        }
+      </ul>
+      }
+    </div>
+
+    <div class="flex justify-end pt-1">
+      <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" (click)="closeDetails()">
+        Close
+      </button>
+    </div>
+  </div>
+  }
+</p-dialog>
+
+<p-dialog [visible]="editDialogVisible()" (visibleChange)="!$event && closeEditDialog()" [modal]="true"
+  [style]="{ width: '26rem' }" [draggable]="false">
+  <ng-template #header>
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <i class="pi pi-pencil" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="text-base font-semibold tracking-tight text-slate-900">Edit teammate</p>
+        <p class="text-xs text-slate-500">Update their name or email address.</p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (editError()) {
+  <p-message severity="error" class="mb-4 block w-full">{{ editError() }}</p-message>
+  }
+  <p-fluid>
+    <form novalidate (submit)="onEditSubmit($event)" class="space-y-5">
+      <div>
+        <label for="edit-name" class="mb-1.5 block text-sm font-medium text-slate-700">Full name</label>
+        <input pInputText id="edit-name" type="text" autocomplete="name" [formField]="editForm.name" />
+        @if (editForm.name().touched() && editForm.name().invalid()) {
+        <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+          {{ editForm.name().errors()[0]?.message }}
+        </p-message>
+        }
+      </div>
+      <div>
+        <label for="edit-email" class="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+        <input pInputText id="edit-email" type="email" autocomplete="email" [formField]="editForm.email" />
+        @if (editForm.email().touched() && editForm.email().invalid()) {
+        <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+          {{ editForm.email().errors()[0]?.message }}
+        </p-message>
+        }
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" (click)="closeEditDialog()"
+          [disabled]="editSubmitting()">Cancel</button>
+        <button pButton type="submit" [fluid]="false" [disabled]="editSubmitting()">
+          @if (editSubmitting()) {
+          Saving&hellip;
+          } @else {
+          Save changes
           }
         </button>
       </div>
