@@ -7,7 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:twik": "node dist/twik/server/server.mjs",
+    "serve:ssr:twik": "node dist/angular/server/server.mjs",
     "setup:appwrite": "node scripts/setup-appwrite.mjs"
   },
   "private": true,
