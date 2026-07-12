@@ -13,6 +13,7 @@ import { InputIcon } from 'primeng/inputicon';
 import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { Select } from 'primeng/select';
+import { Skeleton } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { Tag } from 'primeng/tag';
 import { Textarea } from 'primeng/textarea';
@@ -74,6 +75,7 @@ function emptyProject() {
     InputText,
     Message,
     Select,
+    Skeleton,
     TableModule,
     Tag,
     Textarea,
@@ -93,6 +95,8 @@ export class ProjectList {
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
+  protected readonly viewMode = signal<'table' | 'cards'>('table');
+  protected readonly searchTerm = signal('');
 
   protected readonly rows = computed<ProjectRow[]>(() =>
     this.projects().map((project) => ({
@@ -101,6 +105,14 @@ export class ProjectList {
       assigneeLabel: project.assigneeName ?? 'Unassigned',
     })),
   );
+
+  protected readonly filteredRows = computed<ProjectRow[]>(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return this.rows();
+    return this.rows().filter(
+      (p) => p.name.toLowerCase().includes(term) || p.ownerName.toLowerCase().includes(term) || p.assigneeLabel.toLowerCase().includes(term),
+    );
+  });
 
   protected readonly statusFilterOptions = [
     { label: 'Active', value: 'active' },

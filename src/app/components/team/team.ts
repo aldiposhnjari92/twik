@@ -12,6 +12,7 @@ import { InputIcon } from 'primeng/inputicon';
 import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { Select } from 'primeng/select';
+import { Skeleton } from 'primeng/skeleton';
 import { Tag } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
 import { RouterLink } from '@angular/router';
@@ -81,6 +82,7 @@ function countProjectsPerUser(projects: Project[]): Map<string, number> {
     InputText,
     Message,
     Select,
+    Skeleton,
     Tag,
     TableModule,
     EmptyState,
@@ -107,6 +109,8 @@ export class Team {
   protected readonly errorMessage = signal('');
   protected readonly pageFirst = signal(0);
   protected readonly roleUpdatingId = signal<string | null>(null);
+  protected readonly viewMode = signal<'table' | 'cards'>('table');
+  protected readonly searchTerm = signal('');
 
   protected readonly rows = computed<MemberRow[]>(() => {
     const currentEmail = this.auth.currentUser()?.email;
@@ -121,6 +125,14 @@ export class Team {
         projectCount: counts.get(member.id) ?? 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  protected readonly filteredRows = computed<MemberRow[]>(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return this.rows();
+    return this.rows().filter(
+      (m) => m.name.toLowerCase().includes(term) || m.email.toLowerCase().includes(term) || m.departmentLabel.toLowerCase().includes(term),
+    );
   });
 
   constructor() {

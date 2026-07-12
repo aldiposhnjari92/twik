@@ -8,8 +8,20 @@
       <p-iconfield class="block w-full sm:w-72">
         <p-inputicon class="pi pi-search" />
         <input pInputText type="text" placeholder="Search teammates" class="w-full"
-          (input)="dt.filterGlobal($any($event.target).value, 'contains')" aria-label="Search teammates" />
+          (input)="searchTerm.set($any($event.target).value)" aria-label="Search teammates" />
       </p-iconfield>
+      <div class="inline-flex flex-none gap-0.5 rounded-md border border-slate-200 p-0.5">
+        <button pButton type="button" size="small" [fluid]="false" [text]="viewMode() !== 'table'"
+          [severity]="viewMode() === 'table' ? 'primary' : 'secondary'" [attr.aria-pressed]="viewMode() === 'table'"
+          aria-label="Table view" (click)="viewMode.set('table')">
+          <i class="pi pi-table" pButtonIcon aria-hidden="true"></i>
+        </button>
+        <button pButton type="button" size="small" [fluid]="false" [text]="viewMode() !== 'cards'"
+          [severity]="viewMode() === 'cards' ? 'primary' : 'secondary'" [attr.aria-pressed]="viewMode() === 'cards'"
+          aria-label="Card view" (click)="viewMode.set('cards')">
+          <i class="pi pi-th-large" pButtonIcon aria-hidden="true"></i>
+        </button>
+      </div>
       @if (isAdmin()) {
       <button pButton type="button" size="small" class="flex-none justify-center" (click)="openInviteDialog()">
         <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
@@ -27,7 +39,107 @@
   <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
   }
 
-  <p-table #dt ngSkipHydration [value]="rows()" [loading]="loading()" [paginator]="rows().length > 10" [rows]="10"
+  @if (viewMode() === 'cards') {
+    @if (loading()) {
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+          <div class="rounded-xl border border-slate-200 bg-white p-5">
+            <div class="flex items-center gap-3">
+              <p-skeleton shape="circle" size="3rem" />
+              <div class="flex-1 space-y-2">
+                <p-skeleton width="8rem" height="0.8rem" />
+                <p-skeleton width="11rem" height="0.7rem" />
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (filteredRows().length === 0) {
+      <app-empty-state icon="pi pi-users"
+        [title]="rows().length === 0 ? 'No team members yet' : 'No teammates match your search'"
+        [description]="rows().length === 0 ? 'Invite teammates to start collaborating in your workspace.' : 'Try a different search term.'" />
+    } @else {
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (member of filteredRows(); track member.id) {
+          <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-3">
+                <p-avatar [label]="member.initials" shape="circle" size="large" class="flex-none"
+                  [class]="member.avatarColor + ' text-white font-medium'" />
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <p class="truncate font-medium text-slate-900">{{ member.name }}</p>
+                    @if (member.isYou) {
+                    <p-tag value="You" severity="info" />
+                    }
+                  </div>
+                  <p class="truncate text-xs text-slate-500">{{ member.email }}</p>
+                </div>
+              </div>
+              <div class="flex flex-none items-center gap-0.5">
+                <button pButton type="button" text rounded severity="secondary" size="small" [fluid]="false"
+                  [attr.aria-label]="'View ' + member.name" (click)="openDetails(member)">
+                  <i class="pi pi-eye" pButtonIcon aria-hidden="true"></i>
+                </button>
+                @if (isAdmin()) {
+                <button pButton type="button" text rounded severity="secondary" size="small" [fluid]="false"
+                  [attr.aria-label]="'Edit ' + member.name" (click)="openEditDialog(member)">
+                  <i class="pi pi-pencil" pButtonIcon aria-hidden="true"></i>
+                </button>
+                }
+                @if (isAdmin() && !member.isYou) {
+                <button pButton type="button" text rounded severity="danger" size="small" [fluid]="false"
+                  [attr.aria-label]="'Remove ' + member.name" (click)="confirmRemove(member)">
+                  <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
+                </button>
+                }
+              </div>
+            </div>
+
+            <div class="mt-4 space-y-2.5 border-t border-slate-100 pt-4 text-sm">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-500">Department</span>
+                @if (isAdmin()) {
+                <p-select [ngModel]="member.department" [ngModelOptions]="{ standalone: true }" [appendTo]="'body'"
+                  [filter]="true" [filterBy]="'label'" (ngModelChange)="onDepartmentChange(member, $event)"
+                  [options]="departmentOptions" optionLabel="label" optionValue="value" placeholder="Unassigned"
+                  size="small" [ariaLabel]="'Department for ' + member.name" class="block w-full max-w-[10rem]" />
+                } @else {
+                <span class="text-slate-900">{{ member.departmentLabel }}</span>
+                }
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-500">Projects</span>
+                <span class="inline-flex items-center gap-1.5 text-slate-900">
+                  <i class="pi pi-folder text-slate-400" aria-hidden="true"></i>
+                  {{ member.projectCount }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-500">Role</span>
+                <div class="flex items-center gap-1.5">
+                  @if (member.isAdmin) {
+                  <p-tag value="Admin" severity="warn" />
+                  } @else {
+                  <span class="text-slate-900">Member</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (isAdmin() && !member.isYou) {
+            <button pButton type="button" text size="small" severity="secondary" [fluid]="true"
+              class="mt-3 w-full justify-center" (click)="toggleAdmin(member)"
+              [disabled]="roleUpdatingId() === member.id">
+              {{ member.isAdmin ? 'Remove admin' : 'Make admin' }}
+            </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  } @else {
+  <p-table #dt ngSkipHydration [value]="filteredRows()" [loading]="loading()" [paginator]="filteredRows().length > 10" [rows]="10"
     [first]="pageFirst()" (firstChange)="pageFirst.set($event)"
     [rowsPerPageOptions]="[10, 25, 50]" [globalFilterFields]="['name', 'email', 'departmentLabel']" sortMode="single"
     dataKey="id" [scrollable]="true" scrollHeight="32rem"
@@ -158,6 +270,7 @@
       </tr>
     </ng-template>
   </p-table>
+  }
 </div>
 
 <p-dialog [visible]="dialogVisible()" (visibleChange)="!$event && closeInviteDialog()" [modal]="true"
