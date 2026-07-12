@@ -180,7 +180,7 @@
       </div>
       <div>
         <label for="invitee-department" class="mb-1.5 block text-sm font-medium text-slate-700">Department</label>
-        <p-select [ngModel]="invitee().department" [ngModelOptions]="{ standalone: true }"
+        <p-select [appendTo]="'body'" [filter]="true" [filterBy]="'value'" [ngModel]="invitee().department" [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="onInviteeDepartmentChange($event)" inputId="invitee-department" [options]="departmentOptions"
           optionLabel="label" optionValue="value" placeholder="Choose a department" />
         @if (inviteForm.department().touched() && inviteForm.department().invalid()) {
