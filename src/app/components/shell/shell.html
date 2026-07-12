@@ -1,0 +1,22 @@
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<p-confirmdialog />
+
+<div class="app-shell flex h-dvh overflow-hidden bg-slate-50">
+  <app-sidebar
+    [collapsed]="sidebarCollapsed()"
+    [mobileOpen]="mobileNavOpen()"
+    (collapseToggle)="toggleSidebarCollapse()"
+    (close)="closeMobileNav()"
+    (linkActivated)="closeMobileNavAfterNavigation()"
+  />
+
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+    <app-header [title]="pageTitle()" (openNav)="openMobileNav()" />
+
+    <main id="main-content" tabindex="-1" class="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <app-breadcrumb />
+      <router-outlet />
+    </main>
+  </div>
+</div>

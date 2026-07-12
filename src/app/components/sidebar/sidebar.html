@@ -1,0 +1,57 @@
+@if (mobileOpen()) {
+  <div class="sidebar-backdrop fixed inset-0 z-40 bg-slate-900/50 lg:hidden" (click)="close.emit()"></div>
+}
+
+<aside
+  class="sidebar-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white lg:z-10"
+  [class.is-open]="mobileOpen()"
+  [class.is-collapsed]="collapsed()"
+  aria-label="Primary"
+>
+  <div class="flex h-16 shrink-0 items-center gap-2.5 px-4">
+    <a routerLink="/dashboard" class="flex min-w-0 items-center gap-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+      <span class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">T</span>
+      <span class="sidebar-brand-text truncate text-lg font-semibold tracking-tight text-slate-900">Twik</span>
+    </a>
+
+    <div class="ml-auto lg:hidden">
+      <button pButton type="button" text rounded severity="secondary" aria-label="Close navigation menu" (click)="close.emit()">
+        <i class="pi pi-times" pButtonIcon aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Main">
+    @for (item of navItems; track item.route) {
+      <a
+        [routerLink]="item.route"
+        routerLinkActive="is-active"
+        [ariaCurrentWhenActive]="'page'"
+        class="sidebar-nav-link group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+        [pTooltip]="collapsed() ? item.label : ''"
+        tooltipPosition="right"
+        [showDelay]="300"
+        (click)="linkActivated.emit()"
+      >
+        <i class="{{ item.icon }} flex-none text-base" aria-hidden="true"></i>
+        <span class="sidebar-nav-label truncate">{{ item.label }}</span>
+      </a>
+    }
+  </nav>
+
+  <div class="hidden shrink-0 border-t border-slate-200 p-3 lg:block">
+    <button
+      pButton
+      type="button"
+      text
+      rounded
+      severity="secondary"
+      class="w-full justify-center"
+      [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
+      [attr.aria-pressed]="collapsed()"
+      (click)="collapseToggle.emit()"
+    >
+      <i class="pi" [class.pi-angle-double-right]="collapsed()" [class.pi-angle-double-left]="!collapsed()" pButtonIcon aria-hidden="true"></i>
+    </button>
+  </div>
+</aside>

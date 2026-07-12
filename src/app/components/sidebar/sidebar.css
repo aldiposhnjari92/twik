@@ -1,0 +1,50 @@
+:host {
+  display: block;
+}
+
+.sidebar-panel {
+  width: 18rem;
+  transform: translateX(-100%);
+  transition:
+    transform 200ms ease,
+    width 200ms ease;
+}
+
+.sidebar-panel.is-open {
+  transform: translateX(0);
+}
+
+.sidebar-nav-link.is-active {
+  background-color: var(--p-primary-50, #eff6ff);
+  color: var(--p-primary-700, #1d4ed8);
+}
+
+@media (min-width: 1024px) {
+  .sidebar-panel {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    transform: none;
+  }
+
+  .sidebar-panel.is-collapsed {
+    width: 4.5rem;
+  }
+
+  .sidebar-panel.is-collapsed .sidebar-brand-text,
+  .sidebar-panel.is-collapsed .sidebar-nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sidebar-panel.is-collapsed .sidebar-nav-link {
+    justify-content: center;
+  }
+}

@@ -1,0 +1,205 @@
+<div class="space-y-5">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <h2 class="text-xl font-semibold tracking-tight text-slate-900">Team</h2>
+      <p class="mt-1 text-sm text-slate-500">Manage who has access to your workspace.</p>
+    </div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <p-iconfield class="block w-full sm:w-72">
+        <p-inputicon class="pi pi-search" />
+        <input pInputText type="text" placeholder="Search teammates" class="w-full"
+          (input)="dt.filterGlobal($any($event.target).value, 'contains')" aria-label="Search teammates" />
+      </p-iconfield>
+      @if (isAdmin()) {
+      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openInviteDialog()">
+        <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
+        <span pButtonLabel>Invite teammate</span>
+      </button>
+      }
+    </div>
+  </div>
+
+  @if (!loading() && rows().length > 0) {
+    <p class="text-sm text-slate-500">{{ rows().length }} {{ rows().length === 1 ? 'member' : 'members' }}</p>
+  }
+
+  @if (errorMessage()) {
+  <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  <p-table #dt ngSkipHydration [value]="rows()" [loading]="loading()" [paginator]="rows().length > 10" [rows]="10"
+    [first]="pageFirst()" (firstChange)="pageFirst.set($event)"
+    [rowsPerPageOptions]="[10, 25, 50]" [globalFilterFields]="['name', 'email', 'departmentLabel']" sortMode="single"
+    dataKey="id" [scrollable]="true" scrollHeight="32rem"
+    class="rounded-md border border-slate-200 overflow-hidden shadow-sm" [tableStyle]="{ 'min-width': '52rem' }"
+    [size]="'small'">
+    <ng-template #header>
+      <tr>
+        <th style="width: 3.5rem"><span class="sr-only">Photo</span></th>
+        <th pSortableColumn="name" style="min-width: 12rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Name</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="name" />
+              <p-columnFilter type="text" field="name" display="menu" placeholder="Search name" />
+            </div>
+          </div>
+        </th>
+        <th pSortableColumn="email" class="hidden sm:table-cell" style="min-width: 14rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Email</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="email" />
+              <p-columnFilter type="text" field="email" display="menu" placeholder="Search email" />
+            </div>
+          </div>
+        </th>
+        <th pSortableColumn="departmentLabel" class="hidden md:table-cell" style="width: 13rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Department</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="departmentLabel" />
+              <p-columnFilter field="departmentLabel" matchMode="equals" display="menu" [showMatchModes]="false"
+                [showOperator]="false" [showAddButton]="false">
+                <ng-template #filter let-value let-filter="filterCallback">
+                  <p-select [ngModel]="value" [ngModelOptions]="{ standalone: true }" (ngModelChange)="filter($event)"
+                    [options]="departmentOptions" optionLabel="label" optionValue="value" placeholder="Any department"
+                    [showClear]="true" class="w-full" />
+                </ng-template>
+              </p-columnFilter>
+            </div>
+          </div>
+        </th>
+        <th pSortableColumn="projectCount" style="width: 8rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Projects</span>
+            <p-sortIcon field="projectCount" />
+          </div>
+        </th>
+        <th style="width: 12rem"><span class="text-sm">Role</span></th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-member>
+      <tr class="hover:bg-slate-50">
+        <td>
+          <p-avatar [label]="member.initials" shape="circle" [class]="member.avatarColor + ' text-white font-medium'" />
+        </td>
+        <td>
+          <div class="flex items-center gap-2">
+            <p class="font-medium text-slate-900">{{ member.name }}</p>
+            @if (member.isYou) {
+            <p-tag value="You" severity="info" />
+            }
+          </div>
+          <p class="mt-0.5 truncate text-xs text-slate-500 sm:hidden">{{ member.email }}</p>
+        </td>
+        <td class="hidden text-slate-600 sm:table-cell">{{ member.email }}</td>
+        <td class="hidden md:table-cell">
+          @if (isAdmin()) {
+          <p-select [ngModel]="member.department" [ngModelOptions]="{ standalone: true }" [appendTo]="'body'" [filter]="true" [filterBy]="'label'"
+            (ngModelChange)="onDepartmentChange(member, $event)" [options]="departmentOptions" optionLabel="label"
+            optionValue="value" placeholder="Unassigned" [showClear]="false" size="small"
+            [ariaLabel]="'Department for ' + member.name" class="block w-full max-w-[11rem]" />
+          } @else {
+          <span class="text-sm text-slate-600">{{ member.departmentLabel }}</span>
+          }
+        </td>
+        <td>
+          <span class="inline-flex items-center gap-1.5 text-sm text-slate-600">
+            <i class="pi pi-folder text-slate-400" aria-hidden="true"></i>
+            {{ member.projectCount }}
+          </span>
+        </td>
+        <td>
+          <div class="flex items-center gap-1.5">
+            @if (member.isAdmin) {
+            <p-tag value="Admin" severity="warn" />
+            }
+            @if (isAdmin() && !member.isYou) {
+            <button pButton type="button" text size="small" severity="secondary" [fluid]="false"
+              (click)="toggleAdmin(member)" [disabled]="roleUpdatingId() === member.id">
+              {{ member.isAdmin ? 'Remove' : 'Make admin' }}
+            </button>
+            }
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="p-0">
+          <app-empty-state icon="pi pi-users"
+            [title]="rows().length === 0 ? 'No team members yet' : 'No teammates match your filters'"
+            [description]="rows().length === 0 ? 'Invite teammates to start collaborating in your workspace.' : 'Try adjusting your search or filters.'" />
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog [visible]="dialogVisible()" (visibleChange)="!$event && closeInviteDialog()" [modal]="true"
+  [style]="{ width: '26rem' }" [draggable]="false">
+  <ng-template #header>
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <i class="pi pi-user-plus" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="text-base font-semibold tracking-tight text-slate-900">Invite teammate</p>
+        <p class="text-xs text-slate-500">They'll get an email to set up their account.</p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (inviteError()) {
+  <p-message severity="error" class="mb-4 block w-full">{{ inviteError() }}</p-message>
+  }
+  <p-fluid>
+    <form novalidate (submit)="onInviteSubmit($event)" class="space-y-5">
+      <div>
+        <label for="invitee-name" class="mb-1.5 block text-sm font-medium text-slate-700">Full name</label>
+        <input pInputText id="invitee-name" type="text" autocomplete="name" [formField]="inviteForm.name"
+          placeholder="Jane Doe" />
+        @if (inviteForm.name().touched() && inviteForm.name().invalid()) {
+        <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+          {{ inviteForm.name().errors()[0]?.message }}
+        </p-message>
+        }
+      </div>
+      <div>
+        <label for="invitee-email" class="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+        <input pInputText id="invitee-email" type="email" autocomplete="email" [formField]="inviteForm.email"
+          placeholder="jane.doe@example.com" />
+        @if (inviteForm.email().touched() && inviteForm.email().invalid()) {
+        <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+          {{ inviteForm.email().errors()[0]?.message }}
+        </p-message>
+        }
+      </div>
+      <div>
+        <label for="invitee-department" class="mb-1.5 block text-sm font-medium text-slate-700">Department</label>
+        <p-select [ngModel]="invitee().department" [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onInviteeDepartmentChange($event)" inputId="invitee-department" [options]="departmentOptions"
+          optionLabel="label" optionValue="value" placeholder="Choose a department" />
+        @if (inviteForm.department().touched() && inviteForm.department().invalid()) {
+        <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+          {{ inviteForm.department().errors()[0]?.message }}
+        </p-message>
+        }
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" (click)="closeInviteDialog()"
+          [disabled]="submitting()">Cancel</button>
+        <button pButton type="submit" [fluid]="false" [disabled]="submitting()">
+          @if (submitting()) {
+          Sending invite&hellip;
+          } @else {
+          Send invite
+          }
+        </button>
+      </div>
+    </form>
+  </p-fluid>
+</p-dialog>

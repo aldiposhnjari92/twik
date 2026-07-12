@@ -1,0 +1,240 @@
+<div class="mx-auto max-w-4xl space-y-6">
+  <div>
+    <h2 class="text-xl font-semibold tracking-tight text-slate-900">Settings</h2>
+    <p class="mt-1 text-sm text-slate-500">Manage your workspace, security, and account.</p>
+  </div>
+
+  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event)">
+    <p-tablist>
+      <p-tab value="general"><i class="pi pi-sliders-h mr-2" aria-hidden="true"></i>General</p-tab>
+      <p-tab value="security"><i class="pi pi-shield mr-2" aria-hidden="true"></i>Security</p-tab>
+      <p-tab value="danger"><i class="pi pi-exclamation-triangle mr-2" aria-hidden="true"></i>Danger zone</p-tab>
+    </p-tablist>
+
+    <p-tabpanels>
+      <p-tabpanel value="general">
+        <div class="pt-6">
+          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="border-b border-slate-100 px-6 py-5 sm:px-8">
+              <h3 class="text-base font-semibold tracking-tight text-slate-900">Workspace details</h3>
+              <p class="mt-1 text-sm text-slate-500">These details are visible to everyone in your workspace.</p>
+            </div>
+
+            <form novalidate (submit)="onWorkspaceSubmit($event)">
+              @if (workspaceError() || workspaceSuccess()) {
+                <div class="px-6 pt-5 sm:px-8">
+                  @if (workspaceError()) {
+                    <p-message severity="error" class="block w-full">{{ workspaceError() }}</p-message>
+                  }
+                  @if (workspaceSuccess()) {
+                    <p-message severity="success" class="block w-full">Workspace settings saved.</p-message>
+                  }
+                </div>
+              }
+
+              <div class="divide-y divide-slate-100">
+                <div class="grid grid-cols-1 gap-x-6 gap-y-2 px-6 py-5 sm:grid-cols-3 sm:px-8">
+                  <div>
+                    <label for="workspace-name" class="text-sm font-medium text-slate-700">Workspace name</label>
+                    <p class="mt-1 text-xs text-slate-500">Shown across the workspace and in the sidebar.</p>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <p-fluid>
+                      <input pInputText id="workspace-name" type="text" [formField]="workspaceForm.name"
+                        placeholder="Acme Inc." class="max-w-sm" />
+                    </p-fluid>
+                    @if (workspaceForm.name().touched() && workspaceForm.name().invalid()) {
+                      <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+                        {{ workspaceForm.name().errors()[0]?.message }}
+                      </p-message>
+                    }
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-x-6 gap-y-2 px-6 py-5 sm:grid-cols-3 sm:px-8">
+                  <div>
+                    <label for="workspace-description" class="text-sm font-medium text-slate-700">Description</label>
+                    <p class="mt-1 text-xs text-slate-500">A short summary of what your team does.</p>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <p-fluid>
+                      <textarea pTextarea id="workspace-description" rows="3" [formField]="workspaceForm.description"
+                        placeholder="What does your team do?" class="max-w-lg"></textarea>
+                    </p-fluid>
+                    @if (workspaceForm.description().touched() && workspaceForm.description().invalid()) {
+                      <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+                        {{ workspaceForm.description().errors()[0]?.message }}
+                      </p-message>
+                    }
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-x-6 gap-y-2 px-6 py-5 sm:grid-cols-3 sm:px-8">
+                  <div>
+                    <label for="workspace-timezone" class="text-sm font-medium text-slate-700">Default timezone</label>
+                    <p class="mt-1 text-xs text-slate-500">Used for deadlines and activity timestamps.</p>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <p-select [ngModel]="workspace().timezone" [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onTimezoneChange($event)" inputId="workspace-timezone" [options]="timezoneOptions"
+                      optionLabel="label" optionValue="value" [filter]="true" filterBy="label" class="block w-full max-w-sm" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 border-t border-slate-100 px-6 py-4 sm:px-8">
+                @if (workspaceUpdatedAt()) {
+                  <p class="text-xs text-slate-400">Last updated {{ workspaceUpdatedAt() | date: 'medium' }}</p>
+                } @else {
+                  <span></span>
+                }
+                <button pButton type="submit" [fluid]="false" [disabled]="savingWorkspace() || loadingWorkspace()">
+                  @if (savingWorkspace()) {
+                    Saving&hellip;
+                  } @else {
+                    Save changes
+                  }
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </p-tabpanel>
+
+      <p-tabpanel value="security">
+        <div class="pt-6">
+          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+              <div>
+                <h3 class="text-base font-semibold tracking-tight text-slate-900">Active sessions</h3>
+                <p class="mt-1 text-sm text-slate-500">Devices currently signed in to your account.</p>
+              </div>
+              @if (hasOtherSessions()) {
+                <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" size="small"
+                  class="flex-none justify-center" (click)="revokeOtherSessions()" [disabled]="revokingOthers()">
+                  @if (revokingOthers()) {
+                    Signing out&hellip;
+                  } @else {
+                    Sign out other sessions
+                  }
+                </button>
+              }
+            </div>
+
+            <div class="p-6 sm:p-8">
+              @if (sessionsError()) {
+                <p-message severity="error" class="mb-4 block w-full">{{ sessionsError() }}</p-message>
+              }
+
+              @if (loadingSessions()) {
+                <div class="space-y-3">
+                  @for (i of [1, 2]; track i) {
+                    <div class="flex items-center gap-3.5 rounded-lg border border-slate-100 p-4">
+                      <p-skeleton shape="circle" size="2.5rem" />
+                      <div class="flex-1 space-y-2">
+                        <p-skeleton width="10rem" height="0.8rem" />
+                        <p-skeleton width="14rem" height="0.7rem" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-100">
+                  @for (session of sessionRows(); track session.id) {
+                    <li class="flex items-center justify-between gap-4 p-4">
+                      <div class="flex min-w-0 items-center gap-3.5">
+                        <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                          <i class="pi pi-desktop" aria-hidden="true"></i>
+                        </span>
+                        <div class="min-w-0">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <p class="truncate text-sm font-medium text-slate-900">{{ session.deviceLabel }}</p>
+                            @if (session.current) {
+                              <p-tag value="This device" severity="success" />
+                            }
+                          </div>
+                          <p class="mt-0.5 truncate text-xs text-slate-500">
+                            {{ session.locationLabel }} &middot; Signed in {{ session.createdAt | date: 'medium' }}
+                          </p>
+                        </div>
+                      </div>
+                      @if (!session.current) {
+                        <button pButton type="button" text rounded severity="secondary" size="small" class="flex-none"
+                          [attr.aria-label]="'Sign out ' + session.deviceLabel" (click)="revokeSession(session)"
+                          [disabled]="revokingId() === session.id">
+                          <i class="pi pi-times" aria-hidden="true"></i>
+                        </button>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </section>
+        </div>
+      </p-tabpanel>
+
+      <p-tabpanel value="danger">
+        <div class="pt-6">
+          <section class="overflow-hidden rounded-xl border border-rose-200 bg-white">
+            <div class="border-b border-rose-100 bg-rose-50/50 px-6 py-5 sm:px-8">
+              <h3 class="text-base font-semibold tracking-tight text-rose-900">Danger zone</h3>
+              <p class="mt-1 text-sm text-rose-700">Irreversible and destructive actions.</p>
+            </div>
+            <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+              <div class="max-w-md">
+                <p class="text-sm font-medium text-slate-900">Delete account</p>
+                <p class="mt-1 text-sm text-slate-500">
+                  Permanently delete your account and remove your access to this workspace. This cannot be undone.
+                </p>
+              </div>
+              <button pButton type="button" severity="danger" class="flex-none" (click)="openDeleteDialog()">
+                <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
+                <span pButtonLabel>Delete my account</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>
+
+<p-dialog [visible]="deleteDialogVisible()" (visibleChange)="!$event && closeDeleteDialog()" [modal]="true"
+  [style]="{ width: '26rem' }" [draggable]="false">
+  <ng-template #header>
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-rose-50 text-rose-600">
+        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="text-base font-semibold tracking-tight text-slate-900">Delete your account?</p>
+        <p class="text-xs text-slate-500">This is permanent and cannot be undone.</p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (deleteError()) {
+    <p-message severity="error" class="mb-4 block w-full">{{ deleteError() }}</p-message>
+  }
+  <form novalidate (submit)="confirmDeleteAccount($event)" class="space-y-5">
+    <p-fluid>
+      <div>
+        <label for="delete-password" class="mb-1.5 block text-sm font-medium text-slate-700">Confirm your password</label>
+        <input pPassword id="delete-password" type="password" autocomplete="current-password" [feedback]="false"
+          [ngModel]="deletePassword()" [ngModelOptions]="{ standalone: true }" (ngModelChange)="deletePassword.set($event)" />
+      </div>
+    </p-fluid>
+    <div class="flex justify-end gap-2 pt-1">
+      <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" (click)="closeDeleteDialog()"
+        [disabled]="deleting()">Cancel</button>
+      <button pButton type="submit" severity="danger" [fluid]="false" [disabled]="deleting()">
+        @if (deleting()) {
+          Deleting&hellip;
+        } @else {
+          Delete my account
+        }
+      </button>
+    </div>
+  </form>
+</p-dialog>

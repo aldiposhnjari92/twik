@@ -1,0 +1,264 @@
+<div class="space-y-5">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <h2 class="text-xl font-semibold tracking-tight text-slate-900">Projects</h2>
+      <p class="mt-1 text-sm text-slate-500">Manage your team's projects in one place.</p>
+    </div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <p-iconfield class="block w-full sm:w-72">
+        <p-inputicon class="pi pi-search" />
+        <input pInputText type="text" placeholder="Search projects" class="w-full"
+          (input)="dt.filterGlobal($any($event.target).value, 'contains')" aria-label="Search projects" />
+      </p-iconfield>
+      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openCreateDialog()">
+        <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
+        <span pButtonLabel>New project</span>
+      </button>
+    </div>
+  </div>
+
+  @if (!loading() && rows().length > 0) {
+    <p class="text-sm text-slate-500">{{ rows().length }} {{ rows().length === 1 ? 'project' : 'projects' }}</p>
+  }
+
+  @if (errorMessage()) {
+  <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  <p-table #dt ngSkipHydration [value]="rows()" [loading]="loading()" [paginator]="rows().length > 10" [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]" [globalFilterFields]="['name', 'ownerName', 'assigneeLabel']" sortMode="single"
+    dataKey="id" [scrollable]="true" scrollHeight="32rem"
+    class="rounded-md border border-slate-200 overflow-hidden shadow-sm" [tableStyle]="{ 'min-width': '58rem' }"
+    [size]="'small'">
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="name" style="min-width: 14rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Name</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="name" />
+              <p-columnFilter type="text" field="name" display="menu" placeholder="Search name" />
+            </div>
+          </div>
+        </th>
+        <th pSortableColumn="ownerName" class="hidden md:table-cell" style="width: 11rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Owner</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="ownerName" />
+              <p-columnFilter type="text" field="ownerName" display="menu" placeholder="Search owner" />
+            </div>
+
+          </div>
+        </th>
+        <th pSortableColumn="assigneeLabel" class="hidden lg:table-cell" style="width: 11rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Assigned to</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="assigneeLabel" />
+              <p-columnFilter type="text" field="assigneeLabel" display="menu" placeholder="Search assignee" />
+            </div>
+
+          </div>
+        </th>
+        <th pSortableColumn="status" style="width: 9rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Status</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="status" />
+              <p-columnFilter field="status" matchMode="equals" display="menu" [showMatchModes]="false"
+                [showOperator]="false" [showAddButton]="false">
+                <ng-template #filter let-value let-filter="filterCallback">
+                  <p-select [ngModel]="value" [ngModelOptions]="{ standalone: true }" (ngModelChange)="filter($event)"
+                    [options]="statusFilterOptions" optionLabel="label" optionValue="value" placeholder="Any status"
+                    [showClear]="true" class="w-full" />
+                </ng-template>
+              </p-columnFilter>
+            </div>
+
+          </div>
+        </th>
+        <th pSortableColumn="deadlineDate" class="hidden sm:table-cell" style="width: 11rem">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Deadline</span>
+            <div class="flex items-center gap-2">
+              <p-sortIcon field="deadlineDate" />
+              <p-columnFilter ngSkipHydration type="date" field="deadlineDate" display="menu" />
+            </div>
+
+          </div>
+        </th>
+        <th style="width: 6rem"><span class="sr-only text-sm">Actions</span></th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-project>
+      <tr class="hover:bg-slate-50">
+        <td>
+          <p class="font-medium text-slate-900">{{ project.name }}</p>
+          @if (project.description) {
+          <p class="mt-0.5 line-clamp-1 max-w-xs text-xs text-slate-500">{{ project.description }}</p>
+          }
+        </td>
+        <td class="hidden text-slate-600 md:table-cell">{{ project.ownerName }}</td>
+        <td class="hidden text-slate-600 lg:table-cell">{{ project.assigneeLabel }}</td>
+        <td>
+          <p-tag [value]="project.status === 'active' ? 'Active' : 'Archived'"
+            [severity]="project.status === 'active' ? 'success' : 'secondary'" />
+        </td>
+        <td class="hidden text-slate-500 sm:table-cell">
+          {{ project.deadlineDate ? (project.deadlineDate | date: 'mediumDate') : '—' }}
+        </td>
+        <td>
+          <div class="flex items-center justify-end gap-1">
+            @if (canEdit(project)) {
+            <a [routerLink]="['/projects', project.id, 'edit']" pButton text rounded severity="secondary" size="small"
+              [attr.aria-label]="'Edit ' + project.name">
+              <i class="pi pi-pencil" pButtonIcon aria-hidden="true"></i>
+            </a>
+            }
+            @if (canDelete(project)) {
+            <button pButton type="button" text rounded severity="danger" size="small"
+              [attr.aria-label]="'Delete ' + project.name" (click)="confirmDelete(project)">
+              <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
+            </button>
+            }
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="p-0">
+          <app-empty-state icon="pi pi-folder-open"
+            [title]="rows().length === 0 ? 'No projects yet' : 'No projects match your filters'"
+            [description]="rows().length === 0 ? 'Create your first project to start organizing your team\'s work.' : 'Try adjusting your search or filters.'" />
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog [visible]="dialogVisible()" (visibleChange)="!$event && closeCreateDialog()" [modal]="true"
+  [style]="{ width: '42rem' }" [draggable]="false">
+  <ng-template #header>
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <i class="pi pi-folder-open" aria-hidden="true"></i>
+      </span>
+      <div>
+        <p class="text-base font-semibold tracking-tight text-slate-900">New project</p>
+        <p class="text-xs text-slate-500">Give your project a name your team will recognize.</p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (createError()) {
+  <p-message severity="error" class="mb-4 block w-full">{{ createError() }}</p-message>
+  }
+
+  <p-fluid>
+    <form novalidate (submit)="onCreateSubmit($event)" class="space-y-6">
+      <div class="space-y-5">
+        <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Details</h3>
+
+        <div>
+          <label for="create-name" class="mb-1.5 block text-sm font-medium text-slate-700">Project name</label>
+          <input pInputText id="create-name" type="text" [formField]="projectForm.name"
+            placeholder="Acme website redesign" />
+          @if (projectForm.name().touched() && projectForm.name().invalid()) {
+          <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+            {{ projectForm.name().errors()[0]?.message }}
+          </p-message>
+          }
+        </div>
+
+        <div>
+          <label for="create-description" class="mb-1.5 block text-sm font-medium text-slate-700">
+            Description <span class="font-normal text-slate-400">(optional)</span>
+          </label>
+          <textarea pTextarea id="create-description" rows="3" [value]="project().description"
+            (input)="onDescriptionInput($any($event.target).value)" (blur)="projectForm.description().markAsTouched()"
+            placeholder="What is this project about?"></textarea>
+          @if (projectForm.description().touched() && projectForm.description().invalid()) {
+          <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+            {{ projectForm.description().errors()[0]?.message }}
+          </p-message>
+          }
+        </div>
+      </div>
+
+      <div class="space-y-5 border-t border-slate-100 pt-6">
+        <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Timeline</h3>
+
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <div>
+            <label for="create-startDate" class="mb-1.5 block text-sm font-medium text-slate-700">Start date</label>
+            <p-datepicker ngSkipHydration inputId="create-startDate" [ngModel]="project().startDate"
+              [ngModelOptions]="{ standalone: true }" (ngModelChange)="onStartDateChange($event)"
+              (onBlur)="projectForm.startDate().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
+              iconDisplay="input" placeholder="Select date" />
+            @if (projectForm.startDate().touched() && projectForm.startDate().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ projectForm.startDate().errors()[0]?.message }}
+            </p-message>
+            }
+          </div>
+
+          <div>
+            <label for="create-deadline" class="mb-1.5 block text-sm font-medium text-slate-700">Deadline</label>
+            <p-datepicker ngSkipHydration inputId="create-deadline" [ngModel]="project().deadline"
+              [ngModelOptions]="{ standalone: true }" (ngModelChange)="onDeadlineChange($event)"
+              (onBlur)="projectForm.deadline().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
+              iconDisplay="input" [minDate]="project().startDate" placeholder="Select date" />
+            @if (projectForm.deadline().touched() && projectForm.deadline().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ projectForm.deadline().errors()[0]?.message }}
+            </p-message>
+            }
+          </div>
+
+          <div>
+            <label for="create-iteration" class="mb-1.5 block text-sm font-medium text-slate-700">Iteration</label>
+            <p-datepicker ngSkipHydration inputId="create-iteration" [ngModel]="project().iteration"
+              [ngModelOptions]="{ standalone: true }" (ngModelChange)="onIterationChange($event)"
+              (onBlur)="projectForm.iteration().markAsTouched()" view="month" dateFormat="MM yy" [showIcon]="true"
+              iconDisplay="input" placeholder="Select month" />
+            @if (projectForm.iteration().touched() && projectForm.iteration().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ projectForm.iteration().errors()[0]?.message }}
+            </p-message>
+            }
+          </div>
+        </div>
+        <p class="text-xs text-slate-400">Iterations run one calendar month at a time.</p>
+      </div>
+
+      <div class="space-y-5 border-t border-slate-100 pt-6">
+        <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Assignment</h3>
+
+        <div class="max-w-sm">
+          <label for="create-assignee" class="mb-1.5 block text-sm font-medium text-slate-700">
+            Assigned to <span class="font-normal text-slate-400">(optional)</span>
+          </label>
+          <p-select inputId="create-assignee" [ngModel]="project().assigneeId" [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="onAssigneeChange($event)" [options]="teammates()" optionLabel="name" optionValue="id"
+            placeholder="Unassigned" [showClear]="true" [filter]="true" [filterBy]="'name'" />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 border-t border-slate-100 pt-6">
+        <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false"
+          (click)="closeCreateDialog()" [disabled]="submitting()">Cancel</button>
+        <button pButton type="submit" [fluid]="false" [disabled]="submitting()">
+          @if (submitting()) {
+          Creating&hellip;
+          } @else {
+          Create project
+          }
+        </button>
+      </div>
+    </form>
+  </p-fluid>
+</p-dialog>

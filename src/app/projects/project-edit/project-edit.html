@@ -1,0 +1,136 @@
+<div class="mx-auto max-w-3xl">
+  <header class="mb-6 flex items-center gap-3.5">
+    <span class="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-blue-50 text-blue-600">
+      <i class="pi pi-pencil text-lg" aria-hidden="true"></i>
+    </span>
+    <div>
+      <h2 class="text-xl font-semibold tracking-tight text-slate-900">Edit project</h2>
+      <p class="mt-0.5 text-sm text-slate-500">Update your project's details.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+  <div class="rounded-2xl border border-slate-200 bg-white p-16 text-center text-sm text-slate-500">Loading
+    project&hellip;</div>
+  } @else if (loadError()) {
+  <p-message severity="error" class="block w-full">{{ loadError() }}</p-message>
+  } @else {
+  @if (errorMessage()) {
+  <p-message severity="error" class="mb-6 block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
+    <p-fluid>
+      <form novalidate (submit)="onSubmit($event)">
+        <section class="space-y-5 p-6 sm:p-8">
+          <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Details</h3>
+
+          <div>
+            <label for="name" class="mb-1.5 block text-sm font-medium text-slate-700">Project name</label>
+            <input pInputText id="name" type="text" [formField]="projectForm.name" />
+            @if (projectForm.name().touched() && projectForm.name().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ projectForm.name().errors()[0]?.message }}
+            </p-message>
+            }
+          </div>
+
+          <div>
+            <label for="description" class="mb-1.5 block text-sm font-medium text-slate-700">
+              Description <span class="font-normal text-slate-400">(optional)</span>
+            </label>
+            <textarea pTextarea id="description" rows="4" class="w-full" [value]="project().description"
+              (input)="onDescriptionInput($any($event.target).value)"
+              (blur)="projectForm.description().markAsTouched()"></textarea>
+            @if (projectForm.description().touched() && projectForm.description().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ projectForm.description().errors()[0]?.message }}
+            </p-message>
+            }
+          </div>
+
+          <div>
+            <span class="mb-1.5 block text-sm font-medium text-slate-700">Status</span>
+            <p-selectbutton [formField]="projectForm.status" [options]="statusOptions" optionLabel="label"
+              optionValue="value" />
+          </div>
+        </section>
+
+        <div class="border-t border-slate-100"></div>
+
+        <section class="space-y-5 p-6 sm:p-8">
+          <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Timeline</h3>
+
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div>
+              <label for="startDate" class="mb-1.5 block text-sm font-medium text-slate-700">Start date</label>
+              <p-datepicker ngSkipHydration inputId="startDate" [ngModel]="project().startDate"
+                [ngModelOptions]="{ standalone: true }" (ngModelChange)="onStartDateChange($event)"
+                (onBlur)="projectForm.startDate().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
+                iconDisplay="input" placeholder="Select date" />
+              @if (projectForm.startDate().touched() && projectForm.startDate().invalid()) {
+              <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+                {{ projectForm.startDate().errors()[0]?.message }}
+              </p-message>
+              }
+            </div>
+
+            <div>
+              <label for="deadline" class="mb-1.5 block text-sm font-medium text-slate-700">Deadline</label>
+              <p-datepicker ngSkipHydration inputId="deadline" [ngModel]="project().deadline"
+                [ngModelOptions]="{ standalone: true }" (ngModelChange)="onDeadlineChange($event)"
+                (onBlur)="projectForm.deadline().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
+                iconDisplay="input" [minDate]="project().startDate" placeholder="Select date" />
+              @if (projectForm.deadline().touched() && projectForm.deadline().invalid()) {
+              <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+                {{ projectForm.deadline().errors()[0]?.message }}
+              </p-message>
+              }
+            </div>
+
+            <div>
+              <label for="iteration" class="mb-1.5 block text-sm font-medium text-slate-700">Iteration</label>
+              <p-datepicker ngSkipHydration inputId="iteration" [ngModel]="project().iteration"
+                [ngModelOptions]="{ standalone: true }" (ngModelChange)="onIterationChange($event)"
+                (onBlur)="projectForm.iteration().markAsTouched()" view="month" dateFormat="MM yy" [showIcon]="true"
+                iconDisplay="input" placeholder="Select month" />
+              @if (projectForm.iteration().touched() && projectForm.iteration().invalid()) {
+              <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+                {{ projectForm.iteration().errors()[0]?.message }}
+              </p-message>
+              }
+            </div>
+          </div>
+          <p class="text-xs text-slate-400">Iterations run one calendar month at a time.</p>
+        </section>
+
+        <div class="border-t border-slate-100"></div>
+
+        <section class="space-y-5 p-6 sm:p-8">
+          <h3 class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Assignment</h3>
+
+          <div class="max-w-sm">
+            <label for="assignee" class="mb-1.5 block text-sm font-medium text-slate-700">
+              Assigned to <span class="font-normal text-slate-400">(optional)</span>
+            </label>
+            <p-select inputId="assignee" [ngModel]="project().assigneeId" [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onAssigneeChange($event)" [options]="teammates()" optionLabel="name" optionValue="id"
+              placeholder="Unassigned" [showClear]="true" [filter]="true" [filterBy]="'name'" />
+          </div>
+        </section>
+
+        <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:px-8">
+          <a routerLink="/projects" pButton type="button" severity="secondary" text [fluid]="false">Cancel</a>
+          <button pButton type="submit" [fluid]="false" [disabled]="submitting()">
+            @if (submitting()) {
+            Saving&hellip;
+            } @else {
+            Save changes
+            }
+          </button>
+        </div>
+      </form>
+    </p-fluid>
+  </div>
+  }
+</div>

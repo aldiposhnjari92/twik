@@ -1,0 +1,45 @@
+<header class="app-header sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-6 lg:px-8">
+  <div class="lg:hidden">
+    <button
+      #menuButton
+      pButton
+      type="button"
+      text
+      rounded
+      severity="secondary"
+      aria-label="Open navigation menu"
+      (click)="openNav.emit()"
+    >
+      <i class="pi pi-bars" pButtonIcon aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <h1 class="truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
+    {{ title() }}
+  </h1>
+
+  <div class="ml-auto flex items-center">
+    <button
+      type="button"
+      class="flex items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+      aria-haspopup="true"
+      [attr.aria-label]="'Open account menu for ' + (currentUser()?.name ?? 'your account')"
+      (click)="accountMenu.toggle($event)"
+    >
+      <p-avatar [label]="userInitials()" shape="circle" class="bg-blue-600 text-white" />
+      <span class="hidden sm:inline">{{ currentUser()?.name }}</span>
+      <i class="pi pi-chevron-down text-xs text-slate-400" aria-hidden="true"></i>
+    </button>
+    <p-menu #accountMenu [model]="accountMenuItems" [popup]="true" appendTo="body">
+      <ng-template #start>
+        <div class="flex items-center gap-3 border-b border-slate-100 px-3 py-2.5">
+          <p-avatar [label]="userInitials()" shape="circle" class="bg-blue-600 text-white" />
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-slate-900">{{ currentUser()?.name }}</p>
+            <p class="truncate text-xs text-slate-500">{{ currentUser()?.email }}</p>
+          </div>
+        </div>
+      </ng-template>
+    </p-menu>
+  </div>
+</header>

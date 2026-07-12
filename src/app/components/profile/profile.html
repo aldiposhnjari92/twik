@@ -1,0 +1,129 @@
+<div class="mx-auto max-w-2xl space-y-8">
+  <section class="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+    <div class="mb-6 flex items-center gap-4">
+      <p-avatar [label]="initials()" shape="circle" size="xlarge" class="bg-blue-600 text-white" />
+      <div class="min-w-0">
+        <p class="truncate font-medium text-slate-900">{{ currentUser()?.name }}</p>
+        <p class="truncate text-sm text-slate-500">{{ currentUser()?.email }}</p>
+      </div>
+    </div>
+
+    <h2 class="text-base font-semibold tracking-tight text-slate-900">Profile information</h2>
+    <p class="mt-1 mb-6 text-sm text-slate-500">Update the name associated with your account.</p>
+
+    @if (profileError()) {
+      <p-message severity="error" class="mb-6 block w-full">{{ profileError() }}</p-message>
+    }
+    @if (profileSuccess()) {
+      <p-message severity="success" class="mb-6 block w-full">Your name has been updated.</p-message>
+    }
+
+    <p-fluid>
+      <form novalidate (submit)="onSubmitProfile($event)" class="space-y-6">
+        <div>
+          <label for="name" class="mb-1.5 block text-sm font-medium text-slate-700">Full name</label>
+          <input pInputText id="name" type="text" autocomplete="name" [formField]="profileForm.name" placeholder="Jane Doe" />
+          @if (profileForm.name().touched() && profileForm.name().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ profileForm.name().errors()[0]?.message }}
+            </p-message>
+          }
+        </div>
+
+        <div class="flex justify-end">
+          <button pButton type="submit" [fluid]="false" [disabled]="savingProfile()">
+            @if (savingProfile()) {
+              Saving&hellip;
+            } @else {
+              Save changes
+            }
+          </button>
+        </div>
+      </form>
+    </p-fluid>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+    <h2 class="text-base font-semibold tracking-tight text-slate-900">Password</h2>
+    <p class="mt-1 mb-6 text-sm text-slate-500">Choose a strong password you don't use elsewhere.</p>
+
+    @if (passwordError()) {
+      <p-message severity="error" class="mb-6 block w-full">{{ passwordError() }}</p-message>
+    }
+    @if (passwordSuccess()) {
+      <p-message severity="success" class="mb-6 block w-full">Your password has been updated.</p-message>
+    }
+
+    <p-fluid>
+      <form novalidate (submit)="onSubmitPassword($event)" class="space-y-6">
+        <div>
+          <label for="currentPassword" class="mb-1.5 block text-sm font-medium text-slate-700">Current password</label>
+          <input
+            pPassword
+            id="currentPassword"
+            type="password"
+            autocomplete="current-password"
+            [feedback]="false"
+            [formField]="passwordForm.currentPassword"
+            [class.ng-invalid]="passwordForm.currentPassword().invalid()"
+            [class.ng-dirty]="passwordForm.currentPassword().touched()"
+          />
+          @if (passwordForm.currentPassword().touched() && passwordForm.currentPassword().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ passwordForm.currentPassword().errors()[0]?.message }}
+            </p-message>
+          }
+        </div>
+
+        <div>
+          <label for="newPassword" class="mb-1.5 block text-sm font-medium text-slate-700">New password</label>
+          <input
+            pPassword
+            id="newPassword"
+            type="password"
+            autocomplete="new-password"
+            [feedback]="false"
+            [formField]="passwordForm.newPassword"
+            [class.ng-invalid]="passwordForm.newPassword().invalid()"
+            [class.ng-dirty]="passwordForm.newPassword().touched()"
+            placeholder="At least 8 characters"
+          />
+          @if (passwordForm.newPassword().touched() && passwordForm.newPassword().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ passwordForm.newPassword().errors()[0]?.message }}
+            </p-message>
+          }
+        </div>
+
+        <div>
+          <label for="confirmPassword" class="mb-1.5 block text-sm font-medium text-slate-700">Confirm new password</label>
+          <input
+            pPassword
+            id="confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            [feedback]="false"
+            [formField]="passwordForm.confirmPassword"
+            [class.ng-invalid]="passwordForm.confirmPassword().invalid()"
+            [class.ng-dirty]="passwordForm.confirmPassword().touched()"
+          />
+          @if (passwordForm.confirmPassword().touched() && passwordForm.confirmPassword().invalid()) {
+            <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
+              {{ passwordForm.confirmPassword().errors()[0]?.message }}
+            </p-message>
+          }
+        </div>
+
+        <div class="flex justify-end">
+          <button pButton type="submit" [fluid]="false" [disabled]="savingPassword()">
+            @if (savingPassword()) {
+              Updating&hellip;
+            } @else {
+              Update password
+            }
+          </button>
+        </div>
+      </form>
+    </p-fluid>
+  </section>
+</div>

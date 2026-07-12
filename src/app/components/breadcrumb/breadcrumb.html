@@ -1,0 +1,20 @@
+@if (crumbs().length > 1) {
+  <nav aria-label="Breadcrumb" class="mb-4">
+    <ol class="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
+      @for (crumb of crumbs(); track crumb.url; let last = $last) {
+        <li class="flex items-center gap-1.5">
+          @if (!last) {
+            <a
+              [routerLink]="crumb.url"
+              class="rounded-sm hover:text-slate-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >{{ crumb.label }}</a
+            >
+            <i class="pi pi-angle-right text-[10px] text-slate-300" aria-hidden="true"></i>
+          } @else {
+            <span class="font-medium text-slate-900" aria-current="page">{{ crumb.label }}</span>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+}
