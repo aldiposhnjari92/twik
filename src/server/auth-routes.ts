@@ -17,17 +17,6 @@ async function bootstrapFirstAdmin(client: Client, userId: string): Promise<bool
   return false;
 }
 
-/** New members only join via an admin's invite; self-registration only works to bootstrap a brand-new, empty workspace. */
-async function workspaceAlreadyHasMembers(client: Client): Promise<boolean> {
-  const users = new Users(client);
-  const { total } = await users.list({ queries: [Query.limit(1)] });
-  return total > 0;
-}
-
-const INVITE_ONLY_MESSAGE = 'This workspace is invite-only. Ask an admin to send you an invitation.';
-/** How recent a user's $createdAt has to be to be treated as "just auto-created by this OAuth login". */
-const FRESH_ACCOUNT_WINDOW_MS = 60_000;
-
 function setSessionCookie(req: Request, res: Response, secret: string): void {
   res.cookie(SESSION_COOKIE, secret, {
     httpOnly: true,
@@ -57,11 +46,6 @@ export function registerAuthRoutes(app: Express): void {
 
     try {
       const { client, account } = createAdminClient();
-      if (await workspaceAlreadyHasMembers(client)) {
-        res.status(403).json({ message: INVITE_ONLY_MESSAGE });
-        return;
-      }
-
       const created = await account.create({ userId: ID.unique(), email, password, name });
       const madeAdmin = await bootstrapFirstAdmin(client, created.$id);
       const session = await account.createEmailPasswordSession({ email, password });
@@ -322,21 +306,6 @@ export function registerAuthRoutes(app: Express): void {
 
     try {
       const { client, account } = createAdminClient();
-      const users = new Users(client);
-
-      // Appwrite auto-creates the account for a never-seen Google identity before redirecting here.
-      // Detect that case (very recent $createdAt) and reject it unless this is the bootstrap user.
-      const target = await users.get({ userId });
-      const isFreshAccount = Date.now() - new Date(target.$createdAt).getTime() < FRESH_ACCOUNT_WINDOW_MS;
-      if (isFreshAccount) {
-        const { total } = await users.list({ queries: [Query.limit(2)] });
-        if (total > 1) {
-          await users.delete({ userId });
-          res.redirect('/login?error=invite-only');
-          return;
-        }
-      }
-
       const session = await account.createSession({ userId, secret });
       await bootstrapFirstAdmin(client, userId);
       setSessionCookie(req, res, session.secret);

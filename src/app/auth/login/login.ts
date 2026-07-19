@@ -49,8 +49,6 @@ export class Login {
 
   private initialErrorMessage(): string {
     switch (this.route.snapshot.queryParamMap.get('error')) {
-      case 'invite-only':
-        return 'This workspace is invite-only. Ask an admin to send you an invitation.';
       case 'oauth-failed':
         return "We couldn't complete sign-in with Google. Please try again.";
       default:

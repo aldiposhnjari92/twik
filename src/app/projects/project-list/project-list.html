@@ -10,7 +10,8 @@
         <input pInputText type="text" placeholder="Search projects" class="w-full"
           (input)="searchTerm.set($any($event.target).value)" aria-label="Search projects" />
       </p-iconfield>
-      <div class="inline-flex flex-none gap-0.5 rounded-md border border-slate-200 p-0.5">
+      <div class="flex items-center gap-4 justify-between">
+        <div class="inline-flex flex-none gap-0.5 rounded-md border border-slate-200 p-0.5 max-w-max">
         <button pButton type="button" size="small" [fluid]="false" [text]="viewMode() !== 'table'"
           [severity]="viewMode() === 'table' ? 'primary' : 'secondary'" [attr.aria-pressed]="viewMode() === 'table'"
           aria-label="Table view" (click)="setViewMode('table')">
@@ -26,6 +27,7 @@
         <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
         <span pButtonLabel>New project</span>
       </button>
+      </div>
     </div>
   </div>
 
@@ -275,7 +277,7 @@
             <p-datepicker ngSkipHydration inputId="create-startDate" [ngModel]="project().startDate"
               [ngModelOptions]="{ standalone: true }" (ngModelChange)="onStartDateChange($event)"
               (onBlur)="projectForm.startDate().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
-              iconDisplay="input" placeholder="Select date" />
+              iconDisplay="input" placeholder="Select date" appendTo="body" />
             @if (projectForm.startDate().touched() && projectForm.startDate().invalid()) {
             <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
               {{ projectForm.startDate().errors()[0]?.message }}
@@ -288,7 +290,7 @@
             <p-datepicker ngSkipHydration inputId="create-deadline" [ngModel]="project().deadline"
               [ngModelOptions]="{ standalone: true }" (ngModelChange)="onDeadlineChange($event)"
               (onBlur)="projectForm.deadline().markAsTouched()" dateFormat="M d, yy" [showIcon]="true"
-              iconDisplay="input" [minDate]="project().startDate" placeholder="Select date" />
+              iconDisplay="input" [minDate]="project().startDate" placeholder="Select date" appendTo="body" />
             @if (projectForm.deadline().touched() && projectForm.deadline().invalid()) {
             <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
               {{ projectForm.deadline().errors()[0]?.message }}
@@ -301,7 +303,7 @@
             <p-datepicker ngSkipHydration inputId="create-iteration" [ngModel]="project().iteration"
               [ngModelOptions]="{ standalone: true }" (ngModelChange)="onIterationChange($event)"
               (onBlur)="projectForm.iteration().markAsTouched()" view="month" dateFormat="MM yy" [showIcon]="true"
-              iconDisplay="input" placeholder="Select month" />
+              iconDisplay="input" placeholder="Select month" appendTo="body" />
             @if (projectForm.iteration().touched() && projectForm.iteration().invalid()) {
             <p-message severity="error" variant="simple" size="small" class="mt-1.5 block">
               {{ projectForm.iteration().errors()[0]?.message }}
@@ -321,7 +323,7 @@
           </label>
           <p-select inputId="create-assignee" [ngModel]="project().assigneeId" [ngModelOptions]="{ standalone: true }"
             (ngModelChange)="onAssigneeChange($event)" [options]="teammates()" optionLabel="name" optionValue="id"
-            placeholder="Unassigned" [showClear]="true" [filter]="true" [filterBy]="'name'" />
+            placeholder="Unassigned" [showClear]="true" [filter]="true" [filterBy]="'name'" appendTo="body" />
         </div>
       </div>
 
