@@ -1,7 +1,9 @@
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FormField, emailError, form, requiredError, validate } from '@angular/forms/signals';
+import { Store } from '@ngrx/store';
 import { ConfirmationService } from 'primeng/api';
 import { Avatar } from 'primeng/avatar';
 import { ButtonDirective, ButtonIcon, ButtonLabel } from 'primeng/button';
@@ -19,6 +21,8 @@ import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth/auth';
 import { Notifications } from '../../notifications/notifications';
 import { Project, Projects } from '../../projects/projects';
+import { setViewMode } from '../../state/ui/ui.actions';
+import { selectTeamViewMode } from '../../state/ui/ui.selectors';
 import { DEPARTMENTS, Department, Users, WorkspaceUser } from '../../users/users';
 import { EmptyState } from '../empty-state/empty-state';
 
@@ -98,6 +102,7 @@ export class Team {
   private readonly auth = inject(Auth);
   private readonly injector = inject(Injector);
   private readonly confirmationService = inject(ConfirmationService);
+  private readonly store = inject(Store);
 
   protected readonly departmentOptions = DEPARTMENTS.map((department) => ({ label: department, value: department }));
 
@@ -109,8 +114,12 @@ export class Team {
   protected readonly errorMessage = signal('');
   protected readonly pageFirst = signal(0);
   protected readonly roleUpdatingId = signal<string | null>(null);
-  protected readonly viewMode = signal<'table' | 'cards'>('table');
+  protected readonly viewMode = toSignal(this.store.select(selectTeamViewMode), { initialValue: 'table' as const });
   protected readonly searchTerm = signal('');
+
+  protected setViewMode(mode: 'table' | 'cards'): void {
+    this.store.dispatch(setViewMode({ page: 'team', mode }));
+  }
 
   protected readonly rows = computed<MemberRow[]>(() => {
     const currentEmail = this.auth.currentUser()?.email;

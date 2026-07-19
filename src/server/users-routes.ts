@@ -158,7 +158,7 @@ export function registerUsersRoutes(app: Express): void {
 
       const target = await users.get({ userId: req.params.id });
       if (isAdmin(target)) {
-        const { total } = await users.list({ queries: [Query.equal('labels', ADMIN_LABEL), Query.limit(2)] });
+        const { total } = await users.list({ queries: [Query.contains('labels', [ADMIN_LABEL]), Query.limit(2)] });
         if (total <= 1) {
           res.status(400).json({ message: 'The workspace needs at least one admin.' });
           return;
@@ -190,8 +190,10 @@ export function registerUsersRoutes(app: Express): void {
       const users = new Users(client);
 
       if (!makeAdmin) {
-        const { total } = await users.list({ queries: [Query.equal('labels', ADMIN_LABEL), Query.limit(2)] });
         const targetIsCurrentlyAdmin = (await users.get({ userId: req.params.id })).labels.includes(ADMIN_LABEL);
+        const { total } = targetIsCurrentlyAdmin
+          ? await users.list({ queries: [Query.contains('labels', [ADMIN_LABEL]), Query.limit(2)] })
+          : { total: 0 };
         if (targetIsCurrentlyAdmin && total <= 1) {
           res.status(400).json({ message: 'The workspace needs at least one admin.' });
           return;

@@ -13,12 +13,12 @@
       <div class="inline-flex flex-none gap-0.5 rounded-md border border-slate-200 p-0.5">
         <button pButton type="button" size="small" [fluid]="false" [text]="viewMode() !== 'table'"
           [severity]="viewMode() === 'table' ? 'primary' : 'secondary'" [attr.aria-pressed]="viewMode() === 'table'"
-          aria-label="Table view" (click)="viewMode.set('table')">
+          aria-label="Table view" (click)="setViewMode('table')">
           <i class="pi pi-table" pButtonIcon aria-hidden="true"></i>
         </button>
         <button pButton type="button" size="small" [fluid]="false" [text]="viewMode() !== 'cards'"
           [severity]="viewMode() === 'cards' ? 'primary' : 'secondary'" [attr.aria-pressed]="viewMode() === 'cards'"
-          aria-label="Card view" (click)="viewMode.set('cards')">
+          aria-label="Card view" (click)="setViewMode('cards')">
           <i class="pi pi-th-large" pButtonIcon aria-hidden="true"></i>
         </button>
       </div>

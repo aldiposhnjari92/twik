@@ -1,8 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { FormField, form, maxLengthError, requiredError, validate } from '@angular/forms/signals';
+import { Store } from '@ngrx/store';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective, ButtonIcon, ButtonLabel } from 'primeng/button';
 import { DatePicker } from 'primeng/datepicker';
@@ -20,6 +22,8 @@ import { Textarea } from 'primeng/textarea';
 import { EmptyState } from '../../components/empty-state/empty-state';
 import { Notifications } from '../../notifications/notifications';
 import { Auth } from '../../auth/auth';
+import { setViewMode } from '../../state/ui/ui.actions';
+import { selectProjectsViewMode } from '../../state/ui/ui.selectors';
 import { Users, WorkspaceUser } from '../../users/users';
 import { Project, Projects } from '../projects';
 
@@ -91,12 +95,17 @@ export class ProjectList {
   private readonly notifications = inject(Notifications);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly auth = inject(Auth);
+  private readonly store = inject(Store);
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
-  protected readonly viewMode = signal<'table' | 'cards'>('table');
+  protected readonly viewMode = toSignal(this.store.select(selectProjectsViewMode), { initialValue: 'table' as const });
   protected readonly searchTerm = signal('');
+
+  protected setViewMode(mode: 'table' | 'cards'): void {
+    this.store.dispatch(setViewMode({ page: 'projects', mode }));
+  }
 
   protected readonly rows = computed<ProjectRow[]>(() =>
     this.projects().map((project) => ({

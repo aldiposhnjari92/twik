@@ -308,7 +308,7 @@ export function registerAuthRoutes(app: Express): void {
       });
       res.redirect(url);
     } catch {
-      res.redirect('/login');
+      res.redirect('/login?error=oauth-failed');
     }
   });
 
@@ -342,7 +342,7 @@ export function registerAuthRoutes(app: Express): void {
       setSessionCookie(req, res, session.secret);
       res.redirect('/dashboard');
     } catch {
-      res.redirect('/login');
+      res.redirect('/login?error=oauth-failed');
     }
   });
 }

@@ -1,5 +1,6 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { provideStore } from '@ngrx/store';
 import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import { definePreset } from '@primeuix/themes';
@@ -8,6 +9,9 @@ import Aura from '@primeuix/themes/aura';
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { UI_FEATURE_KEY } from './state/ui/ui.selectors';
+import { uiReducer } from './state/ui/ui.reducer';
+import { uiMetaReducers } from './state/ui/ui.persistence';
 
 const TwikPreset = definePreset(Aura, {
   semantic: {
@@ -32,6 +36,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideClientHydration(),
+    provideStore({ [UI_FEATURE_KEY]: uiReducer }, { metaReducers: uiMetaReducers }),
     FormsModule,
     ReactiveFormsModule,
     MessageService,

@@ -45,11 +45,18 @@ export class Login {
   });
 
   protected readonly submitting = signal(false);
-  protected readonly errorMessage = signal(
-    this.route.snapshot.queryParamMap.get('error') === 'invite-only'
-      ? 'This workspace is invite-only. Ask an admin to send you an invitation.'
-      : '',
-  );
+  protected readonly errorMessage = signal(this.initialErrorMessage());
+
+  private initialErrorMessage(): string {
+    switch (this.route.snapshot.queryParamMap.get('error')) {
+      case 'invite-only':
+        return 'This workspace is invite-only. Ask an admin to send you an invitation.';
+      case 'oauth-failed':
+        return "We couldn't complete sign-in with Google. Please try again.";
+      default:
+        return '';
+    }
+  }
 
   protected async onSubmit(event: Event): Promise<void> {
     event.preventDefault();
