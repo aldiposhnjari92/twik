@@ -1,0 +1,172 @@
+<div class="bg-white">
+  <!-- Nav -->
+  <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4" aria-label="Main">
+      <a routerLink="/" class="flex items-center gap-2.5">
+        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">T</span>
+        <span class="text-lg font-semibold tracking-tight text-slate-900">Twik</span>
+      </a>
+
+      <div class="hidden items-center gap-8 md:flex">
+        <a href="#features" class="text-sm font-medium text-slate-600 hover:text-slate-900">Features</a>
+        <a href="#pricing" class="text-sm font-medium text-slate-600 hover:text-slate-900">Pricing</a>
+        <a href="#faq" class="text-sm font-medium text-slate-600 hover:text-slate-900">FAQ</a>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <a routerLink="/login" class="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</a>
+        <a routerLink="/register"
+          class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+          Start free trial
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero-panel relative overflow-hidden text-white">
+    <div class="pointer-events-none absolute -top-40 -right-24 h-[28rem] w-[28rem] rounded-full bg-blue-500/10 blur-3xl"></div>
+    <div class="pointer-events-none absolute -bottom-32 -left-24 h-[24rem] w-[24rem] rounded-full bg-blue-500/10 blur-3xl"></div>
+
+    <div class="relative mx-auto max-w-4xl px-6 py-24 text-center sm:py-32">
+      <p class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
+        <i class="pi pi-sparkles text-blue-400" aria-hidden="true"></i>
+        Now with a full admin audit log
+      </p>
+      <h1 class="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+        Project management your whole team will actually use.
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
+        Workspaces, projects, and team access in one place — built for teams who want enterprise-grade
+        controls without enterprise-grade complexity.
+      </p>
+
+      <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <a routerLink="/register"
+          class="w-full rounded-md bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:w-auto">
+          Start free trial
+        </a>
+        <a href="#features"
+          class="w-full rounded-md border border-white/15 px-6 py-3 text-base font-medium text-white hover:bg-white/5 sm:w-auto">
+          See what's included
+        </a>
+      </div>
+      <p class="mt-5 text-sm text-slate-500">No credit card required &middot; 14-day free trial &middot; Cancel anytime</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="mx-auto max-w-6xl px-6 py-24">
+    <div class="mx-auto max-w-2xl text-center">
+      <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Everything your team needs, nothing it doesn't</h2>
+      <p class="mt-4 text-lg text-slate-500">A focused toolset for running projects and managing your team, without the bloat.</p>
+    </div>
+
+    <div class="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      @for (feature of features; track feature.title) {
+        <div class="rounded-xl border border-slate-200 bg-white p-6">
+          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <i class="{{ feature.icon }} text-lg" aria-hidden="true"></i>
+          </div>
+          <h3 class="mt-4 text-base font-semibold text-slate-900">{{ feature.title }}</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-500">{{ feature.description }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="border-t border-slate-100 bg-slate-50">
+    <div class="mx-auto max-w-6xl px-6 py-24">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Simple, per-seat pricing</h2>
+        <p class="mt-4 text-lg text-slate-500">Start free. Upgrade when your team outgrows it — no surprises.</p>
+      </div>
+
+      <div class="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        @for (plan of pricingPlans; track plan.name) {
+          <div class="flex flex-col rounded-xl border bg-white p-8"
+            [class]="plan.highlighted ? 'border-blue-600 ring-1 ring-blue-600' : 'border-slate-200'">
+            @if (plan.highlighted) {
+              <p class="mb-4 inline-flex w-fit items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                Most popular
+              </p>
+            }
+            <h3 class="text-lg font-semibold text-slate-900">{{ plan.name }}</h3>
+            <p class="mt-1.5 text-sm text-slate-500">{{ plan.description }}</p>
+            <div class="mt-6 flex items-baseline gap-1.5">
+              <span class="text-4xl font-semibold tracking-tight text-slate-900">{{ plan.price }}</span>
+              @if (plan.priceNote) {
+                <span class="text-sm text-slate-500">{{ plan.priceNote }}</span>
+              }
+            </div>
+
+            <ul class="mt-6 flex-1 space-y-3">
+              @for (item of plan.features; track item) {
+                <li class="flex items-start gap-2.5 text-sm text-slate-600">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-blue-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd"
+                      d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                      clip-rule="evenodd" />
+                  </svg>
+                  {{ item }}
+                </li>
+              }
+            </ul>
+
+            <a routerLink="/register"
+              class="mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-medium"
+              [class]="plan.highlighted ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700' : 'border border-slate-200 text-slate-900 hover:bg-slate-50'">
+              {{ plan.cta }}
+            </a>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="mx-auto max-w-3xl px-6 py-24">
+    <h2 class="text-center text-3xl font-semibold tracking-tight text-slate-900">Frequently asked questions</h2>
+
+    <dl class="mt-12 divide-y divide-slate-100 border-t border-slate-100">
+      @for (faq of faqs; track faq.question) {
+        <div class="py-6">
+          <dt class="text-base font-semibold text-slate-900">{{ faq.question }}</dt>
+          <dd class="mt-2 text-sm leading-relaxed text-slate-500">{{ faq.answer }}</dd>
+        </div>
+      }
+    </dl>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="hero-panel relative overflow-hidden text-white">
+    <div class="pointer-events-none absolute top-1/2 left-1/2 h-[24rem] w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/10 blur-3xl"></div>
+    <div class="relative mx-auto max-w-2xl px-6 py-20 text-center">
+      <h2 class="text-3xl font-semibold tracking-tight sm:text-4xl">Ready to get your team organized?</h2>
+      <p class="mt-4 text-lg text-slate-400">Start your free 14-day trial today. No credit card required.</p>
+      <a routerLink="/register"
+        class="mt-8 inline-block rounded-md bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+        Start free trial
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-200">
+    <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 py-10 sm:flex-row">
+      <a routerLink="/" class="flex items-center gap-2.5">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">T</span>
+        <span class="text-sm font-semibold tracking-tight text-slate-900">Twik</span>
+      </a>
+      <p class="text-sm text-slate-500">Project management for growing teams.</p>
+      <div class="flex items-center gap-6">
+        <a routerLink="/login" class="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</a>
+        <a routerLink="/register" class="text-sm font-medium text-slate-600 hover:text-slate-900">Sign up</a>
+      </div>
+    </div>
+    <div class="border-t border-slate-100 px-6 py-6 text-center text-xs text-slate-400">
+      &copy; {{ currentYear }} Twik. All rights reserved.
+    </div>
+  </footer>
+</div>

@@ -1,8 +1,16 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './auth/admin-guard';
 import { authGuard } from './auth/auth-guard';
+import { guestGuard } from './auth/guest-guard';
 
 export const routes: Routes = [
+    {
+        path: '',
+        pathMatch: 'full',
+        title: 'Twik — Project management for growing teams',
+        canMatch: [guestGuard],
+        loadComponent: () => import('./components/marketing/marketing').then(c => c.Marketing)
+    },
     {
         path: '',
         loadComponent: () => import('./components/shell/shell').then(c => c.Shell),
