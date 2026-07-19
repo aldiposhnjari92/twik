@@ -65,6 +65,11 @@ async function syncSeatQuantity(databases: Databases, teams: ReturnType<typeof c
   }
 }
 
+/** Non-admins don't see admins in the member list — only admins can see everyone. */
+function visibleTo(dtos: UserDto[], workspace: { isAdmin: boolean }): UserDto[] {
+  return workspace.isAdmin ? dtos : dtos.filter((u) => !u.isAdmin);
+}
+
 export function registerUsersRoutes(app: Express): void {
   app.get('/api/users', async (req, res) => {
     const workspace = await requireWorkspace(req, res);
@@ -72,7 +77,7 @@ export function registerUsersRoutes(app: Express): void {
 
     const cached = usersCache.get(workspace.teamId);
     if (cached) {
-      res.json({ users: cached });
+      res.json({ users: visibleTo(cached, workspace) });
       return;
     }
 
@@ -94,7 +99,7 @@ export function registerUsersRoutes(app: Express): void {
       }));
 
       usersCache.set(workspace.teamId, dtos);
-      res.json({ users: dtos });
+      res.json({ users: visibleTo(dtos, workspace) });
     } catch (error) {
       res.status(errorStatus(error)).json({
         message: error instanceof Error ? error.message : 'Could not load users.',
