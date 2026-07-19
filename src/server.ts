@@ -9,6 +9,7 @@ import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import { join } from 'node:path';
+import { registerAuditLogRoutes } from './server/audit-log-routes';
 import { registerAuthRoutes } from './server/auth-routes';
 import { registerBillingRoutes, registerBillingWebhook } from './server/billing-routes';
 import { registerProjectRoutes } from './server/project-routes';
@@ -67,6 +68,7 @@ app.use('/api/auth/password', authLimiter);
 app.use('/api/auth/recovery', authLimiter);
 app.use('/api/auth/account', authLimiter);
 
+registerAuditLogRoutes(app);
 registerAuthRoutes(app);
 registerBillingRoutes(app);
 registerProjectRoutes(app);

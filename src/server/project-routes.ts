@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { ID, Permission, Query, Role, type Models } from 'node-appwrite';
 import { requireWorkspace } from './access';
+import { logEvent } from './audit-log';
 import { DATABASE_ID, FREE_PROJECT_LIMIT, effectivePlan, getWorkspaceBillingDoc } from './billing';
 import { errorStatus } from './session';
 
@@ -239,6 +240,14 @@ export function registerProjectRoutes(app: Express): void {
           Permission.delete(Role.team(workspace.teamId)),
         ],
       );
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'project.created',
+        targetType: 'project',
+        targetLabel: doc.name,
+      });
       res.status(201).json(toDto(doc));
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -278,6 +287,15 @@ export function registerProjectRoutes(app: Express): void {
       }
 
       const doc = await databases.updateDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id'], fields);
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'project.updated',
+        targetType: 'project',
+        targetLabel: doc.name,
+        metadata: { changed: Object.keys(fields) },
+      });
       res.json(toDto(doc));
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -301,6 +319,14 @@ export function registerProjectRoutes(app: Express): void {
       }
 
       await databases.deleteDocument(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'project.deleted',
+        targetType: 'project',
+        targetLabel: current.name,
+      });
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({

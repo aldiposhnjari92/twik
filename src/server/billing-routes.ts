@@ -4,6 +4,7 @@ import { Query, type Databases } from 'node-appwrite';
 import type Stripe from 'stripe';
 import { requireAdmin, requireWorkspace } from './access';
 import { createAdminClient } from './appwrite-admin';
+import { SYSTEM_ACTOR, logEvent } from './audit-log';
 import {
   DATABASE_ID,
   FREE_PROJECT_LIMIT,
@@ -44,6 +45,7 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
       });
+      await logEvent({ teamId, ...SYSTEM_ACTOR, action: 'billing.subscription_started', targetType: 'billing' });
       return;
     }
 
@@ -54,6 +56,13 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       if (!doc) return;
 
       await databases.updateDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, doc.$id, { subscriptionStatus: subscription.status });
+      await logEvent({
+        teamId: doc.$id,
+        ...SYSTEM_ACTOR,
+        action: 'billing.subscription_updated',
+        targetType: 'billing',
+        metadata: { status: subscription.status },
+      });
       return;
     }
 
@@ -68,6 +77,7 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
         subscriptionStatus: 'canceled',
         stripeSubscriptionId: null,
       });
+      await logEvent({ teamId: doc.$id, ...SYSTEM_ACTOR, action: 'billing.subscription_canceled', targetType: 'billing' });
       return;
     }
 
@@ -79,6 +89,7 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       if (!doc) return;
 
       await databases.updateDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, doc.$id, { subscriptionStatus: 'past_due' });
+      await logEvent({ teamId: doc.$id, ...SYSTEM_ACTOR, action: 'billing.payment_failed', targetType: 'billing' });
       return;
     }
 

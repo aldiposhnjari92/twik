@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './auth/admin-guard';
 import { authGuard } from './auth/auth-guard';
 
 export const routes: Routes = [
@@ -37,6 +38,12 @@ export const routes: Routes = [
                 path: 'team',
                 title: 'Team',
                 loadComponent: () => import('./components/team/team').then(c => c.Team)
+            },
+            {
+                path: 'audit-log',
+                title: 'Audit Log',
+                canActivate: [adminGuard],
+                loadComponent: () => import('./components/audit-log/audit-log').then(c => c.AuditLogPage)
             },
             {
                 path: 'settings',

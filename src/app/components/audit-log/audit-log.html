@@ -1,0 +1,60 @@
+<div class="space-y-5">
+  <div>
+    <h2 class="text-xl font-semibold tracking-tight text-slate-900">Audit log</h2>
+    <p class="mt-1 text-sm text-slate-500">A record of who changed what in your workspace.</p>
+  </div>
+
+  @if (errorMessage()) {
+    <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    @if (loading()) {
+      <div class="divide-y divide-slate-100">
+        @for (i of [1, 2, 3, 4, 5]; track i) {
+          <div class="flex items-center gap-3.5 p-4">
+            <p-skeleton shape="circle" size="2.25rem" />
+            <div class="flex-1 space-y-2">
+              <p-skeleton width="16rem" height="0.8rem" />
+              <p-skeleton width="9rem" height="0.7rem" />
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (events().length === 0) {
+      <div class="p-6">
+        <app-empty-state icon="pi pi-history" title="No activity yet"
+          description="Actions taken in your workspace will show up here." />
+      </div>
+    } @else {
+      <ul class="divide-y divide-slate-100">
+        @for (event of events(); track event.id) {
+          <li class="flex items-start gap-3.5 p-4">
+            <span class="mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <i class="{{ iconFor(event.action) }}" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-slate-900">
+                <span class="font-medium">{{ event.actorName }}</span> {{ labelFor(event) }}
+              </p>
+              <p class="mt-0.5 text-xs text-slate-500">{{ event.createdAt | date: 'medium' }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+
+      @if (nextCursor()) {
+        <div class="border-t border-slate-100 p-4 text-center">
+          <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" size="small"
+            (click)="loadMore()" [disabled]="loadingMore()">
+            @if (loadingMore()) {
+              Loading&hellip;
+            } @else {
+              Load more
+            }
+          </button>
+        </div>
+      }
+    }
+  </div>
+</div>

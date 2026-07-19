@@ -19,6 +19,7 @@ const PROJECT_ID = 'twik';
 const DATABASE_ID = 'main';
 const PROJECTS_COLLECTION_ID = 'projects';
 const WORKSPACE_COLLECTION_ID = 'workspace';
+const AUDIT_LOG_COLLECTION_ID = 'audit_logs';
 
 const client = new Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID).setKey(apiKey);
 const databases = new Databases(client);
@@ -241,6 +242,67 @@ async function ensureStripeCustomerIdIndex() {
   console.log('Created "stripeCustomerId_idx" index.');
 }
 
+const AUDIT_LOG_ATTRIBUTES = [
+  { key: 'workspaceId', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'workspaceId', 36, true) },
+  { key: 'actorId', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'actorId', 64, true) },
+  { key: 'actorName', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'actorName', 128, true) },
+  { key: 'action', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'action', 64, true) },
+  { key: 'targetType', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'targetType', 32, false) },
+  { key: 'targetLabel', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'targetLabel', 200, false) },
+  { key: 'metadata', create: () => databases.createStringAttribute(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'metadata', 2000, false) },
+];
+
+// Admin-only read (Permission.read(Role.team(teamId, 'admin')) set per-document at write time) —
+// stricter than projects/workspace, since an audit log is inherently an admin/compliance surface.
+// Nobody ever writes via a session client, so collection-level permissions stay empty; every write
+// goes through the admin client from src/server/audit-log.ts.
+async function ensureAuditLogCollection() {
+  try {
+    await databases.getCollection(DATABASE_ID, AUDIT_LOG_COLLECTION_ID);
+    console.log(`Collection "${AUDIT_LOG_COLLECTION_ID}" already exists.`);
+  } catch (error) {
+    if (error.code !== 404) throw error;
+    await databases.createCollection(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'Audit Log', [], true);
+    console.log(`Created collection "${AUDIT_LOG_COLLECTION_ID}".`);
+  }
+
+  await databases.updateCollection({
+    databaseId: DATABASE_ID,
+    collectionId: AUDIT_LOG_COLLECTION_ID,
+    name: 'Audit Log',
+    permissions: [],
+    documentSecurity: true,
+  });
+
+  const { attributes: existingAttributes } = await databases.listAttributes(DATABASE_ID, AUDIT_LOG_COLLECTION_ID);
+  const existingKeys = new Set(existingAttributes.map((a) => a.key));
+  const missing = AUDIT_LOG_ATTRIBUTES.filter((a) => !existingKeys.has(a.key));
+
+  if (missing.length === 0) {
+    console.log('All audit log attributes already exist.');
+    return;
+  }
+
+  for (const attribute of missing) {
+    await attribute.create();
+  }
+  console.log(`Created attributes: ${missing.map((a) => a.key).join(', ')}. Waiting for them to become available...`);
+  await waitForAttributes(AUDIT_LOG_COLLECTION_ID, missing.map((a) => a.key));
+  console.log('All audit log attributes are available.');
+}
+
+async function ensureAuditLogWorkspaceIdIndex() {
+  const { indexes } = await databases.listIndexes(DATABASE_ID, AUDIT_LOG_COLLECTION_ID);
+  if (indexes.some((index) => index.key === 'workspaceId_idx')) {
+    console.log('"workspaceId_idx" index already exists on audit_logs.');
+    return;
+  }
+
+  await databases.createIndex(DATABASE_ID, AUDIT_LOG_COLLECTION_ID, 'workspaceId_idx', 'key', ['workspaceId']);
+  await waitForIndexAvailable(AUDIT_LOG_COLLECTION_ID, 'workspaceId_idx');
+  console.log('Created "workspaceId_idx" index on audit_logs.');
+}
+
 await ensureDatabase();
 await ensureProjectsCollection();
 await ensureNameSearchIndex();
@@ -248,4 +310,6 @@ await ensureStatusIndex();
 await ensureWorkspaceIdIndex();
 await ensureWorkspaceCollection();
 await ensureStripeCustomerIdIndex();
+await ensureAuditLogCollection();
+await ensureAuditLogWorkspaceIdIndex();
 console.log('Appwrite setup complete.');

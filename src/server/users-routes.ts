@@ -2,6 +2,7 @@ import type { Express } from 'express';
 import { ID, Query, Users, type Databases } from 'node-appwrite';
 import { ADMIN_ROLE, MEMBER_ROLE, requireAdmin, requireWorkspace } from './access';
 import { createAdminClient } from './appwrite-admin';
+import { logEvent } from './audit-log';
 import { FREE_SEAT_LIMIT, effectivePlan, getWorkspaceBillingDoc } from './billing';
 import { KeyedTtlCache } from './cache';
 import { errorStatus, originOf } from './session';
@@ -134,6 +135,14 @@ export function registerUsersRoutes(app: Express): void {
       // Server-initiated with an existing userId completes immediately — no separate invitation email.
       const membership = await teams.createMembership({ teamId: workspace.teamId, userId: created.$id, roles: [MEMBER_ROLE] });
       await syncSeatQuantity(databases, teams, workspace.teamId);
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'member.invited',
+        targetType: 'member',
+        targetLabel: created.name,
+      });
 
       usersCache.clear(workspace.teamId);
       res.status(201).json({
@@ -195,6 +204,16 @@ export function registerUsersRoutes(app: Express): void {
         await users.updatePrefs({ userId: req.params.id, prefs: { department } });
       }
 
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'member.updated',
+        targetType: 'member',
+        targetLabel: name?.trim() ?? membership.userName,
+        metadata: { changed: [name !== undefined && 'name', email !== undefined && 'email', department !== undefined && 'department'].filter(Boolean) },
+      });
+
       usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {
@@ -232,6 +251,14 @@ export function registerUsersRoutes(app: Express): void {
       // under Settings → Danger zone, not something removing a teammate should do.
       await teams.deleteMembership({ teamId: workspace.teamId, membershipId: membership.$id });
       await syncSeatQuantity(databases, teams, workspace.teamId);
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'member.removed',
+        targetType: 'member',
+        targetLabel: membership.userName,
+      });
       usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {
@@ -267,6 +294,15 @@ export function registerUsersRoutes(app: Express): void {
       }
 
       await teams.updateMembership({ teamId: workspace.teamId, membershipId: membership.$id, roles: [makeAdmin ? ADMIN_ROLE : MEMBER_ROLE] });
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'member.role_changed',
+        targetType: 'member',
+        targetLabel: membership.userName,
+        metadata: { isAdmin: makeAdmin },
+      });
       usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {

@@ -101,12 +101,20 @@ async function run() {
     console.warn('  No existing users found — the workspace has no members yet. The next person to register or sign in will need to be added manually, or this migration re-run after they exist.');
   }
 
-  await databases.createDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, teamId, {
-    name: workspaceName,
-    description: oldSettings?.description ?? '',
-    timezone: oldSettings?.timezone ?? 'UTC',
-    plan: 'free',
-  });
+  await databases.createDocument(
+    DATABASE_ID,
+    WORKSPACE_COLLECTION_ID,
+    teamId,
+    {
+      name: workspaceName,
+      description: oldSettings?.description ?? '',
+      timezone: oldSettings?.timezone ?? 'UTC',
+      plan: 'free',
+    },
+    // documentSecurity is on for this collection — without explicit permissions, the document is
+    // only ever readable by the admin/API-key client, not by the workspace's own members.
+    [Permission.read(Role.team(teamId)), Permission.update(Role.team(teamId, ADMIN_ROLE))],
+  );
   console.log(`Created workspace settings document at ${teamId}.`);
 
   const allProjects = await fetchAllProjects();

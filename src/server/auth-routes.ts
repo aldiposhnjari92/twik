@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from 'express';
-import { ID, OAuthProvider, Users } from 'node-appwrite';
+import { ID, OAuthProvider, Permission, Role, Users } from 'node-appwrite';
 import { ADMIN_ROLE, resolveWorkspace, requireWorkspace, type WorkspaceContext } from './access';
 import { createAdminClient, createSessionClient } from './appwrite-admin';
 import { DATABASE_ID, WORKSPACE_COLLECTION_ID } from './billing';
@@ -22,14 +22,22 @@ async function bootstrapWorkspace(admin: ReturnType<typeof createAdminClient>, u
 
   await admin.teams.create({ teamId, name: workspaceName });
   await admin.teams.createMembership({ teamId, userId, roles: [ADMIN_ROLE] });
-  await admin.databases.createDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, teamId, {
-    name: workspaceName,
-    description: '',
-    timezone: 'UTC',
-    plan: 'pro',
-    subscriptionStatus: 'trialing',
-    trialEndsAt,
-  });
+  await admin.databases.createDocument(
+    DATABASE_ID,
+    WORKSPACE_COLLECTION_ID,
+    teamId,
+    {
+      name: workspaceName,
+      description: '',
+      timezone: 'UTC',
+      plan: 'pro',
+      subscriptionStatus: 'trialing',
+      trialEndsAt,
+    },
+    // documentSecurity is on for this collection — without explicit permissions here, the document
+    // is only ever readable by the admin/API-key client, not by the workspace's own members.
+    [Permission.read(Role.team(teamId)), Permission.update(Role.team(teamId, ADMIN_ROLE))],
+  );
   return teamId;
 }
 

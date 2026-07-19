@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import type { Models } from 'node-appwrite';
 import { requireAdmin, requireWorkspace } from './access';
+import { logEvent } from './audit-log';
 import { DATABASE_ID, WORKSPACE_COLLECTION_ID } from './billing';
 import { KeyedTtlCache } from './cache';
 import { errorStatus } from './session';
@@ -109,6 +110,14 @@ export function registerWorkspaceRoutes(app: Express): void {
       const doc = await workspace.databases.updateDocument<WorkspaceDocument>(DATABASE_ID, WORKSPACE_COLLECTION_ID, workspace.teamId, fields);
       const dto = toDto(doc);
       workspaceCache.set(workspace.teamId, dto);
+      await logEvent({
+        teamId: workspace.teamId,
+        actorId: workspace.user.$id,
+        actorName: workspace.user.name,
+        action: 'workspace.updated',
+        targetType: 'workspace',
+        metadata: { changed: Object.keys(fields) },
+      });
       res.json(dto);
     } catch (error) {
       res.status(errorStatus(error)).json({
