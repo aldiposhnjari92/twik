@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Toast } from 'primeng/toast';
 import { NetworkStatus } from './notifications/network-status';
@@ -10,8 +10,6 @@ import { NetworkStatus } from './notifications/network-status';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('twik');
-
   /** Instantiates the singleton so it starts listening for connectivity changes app-wide. */
   private readonly networkStatus = inject(NetworkStatus);
 }
