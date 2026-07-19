@@ -1,9 +1,11 @@
 import type { Express } from 'express';
-import { ID, Query, Users } from 'node-appwrite';
+import { ID, Query, Users, type Databases } from 'node-appwrite';
 import { ADMIN_ROLE, MEMBER_ROLE, requireAdmin, requireWorkspace } from './access';
 import { createAdminClient } from './appwrite-admin';
+import { FREE_SEAT_LIMIT, effectivePlan, getWorkspaceBillingDoc } from './billing';
 import { KeyedTtlCache } from './cache';
 import { errorStatus, originOf } from './session';
+import { getStripeClient } from './stripe-client';
 
 const LIST_LIMIT = 100;
 const USERS_CACHE_TTL_MS = 15_000;
@@ -39,6 +41,27 @@ async function findMembership(teams: ReturnType<typeof createAdminClient>['teams
 async function countAdmins(teams: ReturnType<typeof createAdminClient>['teams'], teamId: string): Promise<number> {
   const { total } = await teams.listMemberships({ teamId, queries: [Query.contains('roles', [ADMIN_ROLE]), Query.limit(2)] });
   return total;
+}
+
+/** Keeps a live Stripe subscription's billed seat count matching actual membership count. Best-effort — a sync failure shouldn't block inviting or removing a teammate. */
+async function syncSeatQuantity(databases: Databases, teams: ReturnType<typeof createAdminClient>['teams'], teamId: string): Promise<void> {
+  try {
+    const doc = await getWorkspaceBillingDoc(databases, teamId);
+    if (!doc.stripeSubscriptionId || effectivePlan(doc) !== 'pro') return;
+
+    const stripe = getStripeClient();
+    const [{ total: seatCount }, subscription] = await Promise.all([
+      teams.listMemberships({ teamId, queries: [Query.limit(1)] }),
+      stripe.subscriptions.retrieve(doc.stripeSubscriptionId),
+    ]);
+
+    const item = subscription.items.data[0];
+    if (!item) return;
+
+    await stripe.subscriptionItems.update(item.id, { quantity: Math.max(seatCount, 1) });
+  } catch {
+    // Swallowed intentionally — see doc comment above.
+  }
 }
 
 export function registerUsersRoutes(app: Express): void {
@@ -93,13 +116,24 @@ export function registerUsersRoutes(app: Express): void {
     }
 
     try {
-      const { client, account, teams } = createAdminClient();
+      const { client, account, databases, teams } = createAdminClient();
+
+      const billingDoc = await getWorkspaceBillingDoc(databases, workspace.teamId);
+      if (effectivePlan(billingDoc) === 'free') {
+        const { total: seatCount } = await teams.listMemberships({ teamId: workspace.teamId, queries: [Query.limit(1)] });
+        if (seatCount >= FREE_SEAT_LIMIT) {
+          res.status(402).json({ message: `The free plan is limited to ${FREE_SEAT_LIMIT} seats. Upgrade to Pro to invite more teammates.` });
+          return;
+        }
+      }
+
       const users = new Users(client);
       const created = await users.create({ userId: ID.unique(), email, name });
       await users.updatePrefs({ userId: created.$id, prefs: { department } });
       await account.createRecovery({ email, url: `${originOf(req)}/reset-password` });
       // Server-initiated with an existing userId completes immediately — no separate invitation email.
       const membership = await teams.createMembership({ teamId: workspace.teamId, userId: created.$id, roles: [MEMBER_ROLE] });
+      await syncSeatQuantity(databases, teams, workspace.teamId);
 
       usersCache.clear(workspace.teamId);
       res.status(201).json({
@@ -180,7 +214,7 @@ export function registerUsersRoutes(app: Express): void {
     }
 
     try {
-      const { teams } = createAdminClient();
+      const { databases, teams } = createAdminClient();
 
       const membership = await findMembership(teams, workspace.teamId, req.params.id);
       if (!membership) {
@@ -197,6 +231,7 @@ export function registerUsersRoutes(app: Express): void {
       // workspace they might belong to) is untouched. Account deletion is a self-service action
       // under Settings → Danger zone, not something removing a teammate should do.
       await teams.deleteMembership({ teamId: workspace.teamId, membershipId: membership.$id });
+      await syncSeatQuantity(databases, teams, workspace.teamId);
       usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {

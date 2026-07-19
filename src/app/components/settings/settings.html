@@ -7,6 +7,7 @@
   <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event)">
     <p-tablist>
       <p-tab value="general"><i class="pi pi-sliders-h mr-2" aria-hidden="true"></i>General</p-tab>
+      <p-tab value="billing"><i class="pi pi-credit-card mr-2" aria-hidden="true"></i>Billing</p-tab>
       <p-tab value="security"><i class="pi pi-shield mr-2" aria-hidden="true"></i>Security</p-tab>
       <p-tab value="danger"><i class="pi pi-exclamation-triangle mr-2" aria-hidden="true"></i>Danger zone</p-tab>
     </p-tablist>
@@ -97,6 +98,82 @@
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      </p-tabpanel>
+
+      <p-tabpanel value="billing">
+        <div class="pt-6">
+          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="border-b border-slate-100 px-6 py-5 sm:px-8">
+              <h3 class="text-base font-semibold tracking-tight text-slate-900">Plan &amp; billing</h3>
+              <p class="mt-1 text-sm text-slate-500">Manage your workspace's subscription and usage.</p>
+            </div>
+
+            @if (billingError()) {
+              <div class="px-6 pt-5 sm:px-8">
+                <p-message severity="error" class="block w-full">{{ billingError() }}</p-message>
+              </div>
+            }
+
+            @if (loadingBilling()) {
+              <div class="space-y-3 p-6 sm:p-8">
+                <p-skeleton width="8rem" height="1.5rem" />
+                <p-skeleton width="16rem" height="0.8rem" />
+              </div>
+            } @else if (billing(); as b) {
+              <div class="divide-y divide-slate-100">
+                <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                  <div class="flex items-center gap-3">
+                    <p-tag [value]="b.plan | titlecase" [severity]="b.plan === 'free' ? 'secondary' : b.plan === 'pro' ? 'success' : 'info'" />
+                    @if (isTrialing()) {
+                      <span class="text-sm text-slate-600">
+                        Trial &mdash; {{ trialDaysLeft() }} {{ trialDaysLeft() === 1 ? 'day' : 'days' }} left
+                      </span>
+                    }
+                  </div>
+
+                  @if (!auth.isAdmin()) {
+                    <p class="text-xs text-slate-400">Only workspace admins can make billing changes.</p>
+                  } @else if (b.plan === 'enterprise') {
+                    <p class="text-xs text-slate-400">Contact us to make changes to your Enterprise plan.</p>
+                  } @else if (isPaidPro()) {
+                    <button pButton type="button" severity="secondary" [outlined]="true" [fluid]="false" size="small"
+                      class="flex-none justify-center" (click)="openPortal()" [disabled]="openingPortal()">
+                      @if (openingPortal()) {
+                        Opening&hellip;
+                      } @else {
+                        Manage billing
+                      }
+                    </button>
+                  } @else {
+                    <button pButton type="button" [fluid]="false" size="small" class="flex-none justify-center"
+                      (click)="startCheckout()" [disabled]="checkingOut()">
+                      @if (checkingOut()) {
+                        Redirecting&hellip;
+                      } @else {
+                        Upgrade to Pro
+                      }
+                    </button>
+                  }
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2 sm:px-8">
+                  <div>
+                    <p class="text-sm font-medium text-slate-700">Seats</p>
+                    <p class="mt-1 text-sm text-slate-500">
+                      {{ b.seatCount }}{{ b.seatLimit ? ' / ' + b.seatLimit : '' }} used
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-slate-700">Projects</p>
+                    <p class="mt-1 text-sm text-slate-500">
+                      {{ b.projectCount }}{{ b.projectLimit ? ' / ' + b.projectLimit : '' }} used
+                    </p>
+                  </div>
+                </div>
+              </div>
+            }
           </section>
         </div>
       </p-tabpanel>

@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FormField, form, maxLengthError, requiredError, validate } from '@angular/forms/signals';
 import { Router } from '@angular/router';
@@ -15,11 +15,18 @@ import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { Tag } from 'primeng/tag';
 import { Textarea } from 'primeng/textarea';
 import { Auth, UserSession } from '../../auth/auth';
+import { Billing, BillingSummary } from '../../billing/billing';
 import { Notifications } from '../../notifications/notifications';
 import { TIMEZONES, Timezone, Workspace } from '../../workspace/workspace';
 
 const NAME_MAX_LENGTH = 200;
 const DESCRIPTION_MAX_LENGTH = 2000;
+
+function daysUntil(iso: string | null): number {
+  if (!iso) return 0;
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / MS_PER_DAY));
+}
 
 interface SessionRow extends UserSession {
   deviceLabel: string;
@@ -58,13 +65,15 @@ function locationLabelOf(session: UserSession): string {
     Tag,
     Textarea,
     DatePipe,
+    TitleCasePipe,
   ],
   templateUrl: './settings.html',
   styleUrl: './settings.css',
 })
 export class Settings {
   private readonly workspaceApi = inject(Workspace);
-  private readonly auth = inject(Auth);
+  private readonly billingApi = inject(Billing);
+  protected readonly auth = inject(Auth);
   private readonly notifications = inject(Notifications);
   private readonly router = inject(Router);
 
@@ -101,6 +110,17 @@ export class Settings {
     });
   });
 
+  // --- Billing ---
+  protected readonly loadingBilling = signal(true);
+  protected readonly billingError = signal('');
+  protected readonly billing = signal<BillingSummary | null>(null);
+  protected readonly checkingOut = signal(false);
+  protected readonly openingPortal = signal(false);
+
+  protected readonly trialDaysLeft = computed(() => daysUntil(this.billing()?.trialEndsAt ?? null));
+  protected readonly isTrialing = computed(() => this.billing()?.subscriptionStatus === 'trialing');
+  protected readonly isPaidPro = computed(() => this.billing()?.plan === 'pro' && !this.isTrialing());
+
   // --- Security & sessions ---
   protected readonly loadingSessions = signal(true);
   protected readonly sessionsError = signal('');
@@ -126,6 +146,7 @@ export class Settings {
 
   constructor() {
     this.loadWorkspace();
+    this.loadBilling();
     this.loadSessions();
   }
 
@@ -166,6 +187,40 @@ export class Settings {
       this.workspaceError.set(error instanceof Error ? error.message : 'Could not update workspace settings.');
     } finally {
       this.savingWorkspace.set(false);
+    }
+  }
+
+  private async loadBilling(): Promise<void> {
+    this.loadingBilling.set(true);
+    this.billingError.set('');
+    try {
+      this.billing.set(await this.billingApi.get());
+    } catch (error) {
+      this.billingError.set(error instanceof Error ? error.message : 'Could not load billing details.');
+    } finally {
+      this.loadingBilling.set(false);
+    }
+  }
+
+  protected async startCheckout(): Promise<void> {
+    this.checkingOut.set(true);
+    this.billingError.set('');
+    try {
+      await this.billingApi.startCheckout();
+    } catch (error) {
+      this.billingError.set(error instanceof Error ? error.message : 'Could not start checkout.');
+      this.checkingOut.set(false);
+    }
+  }
+
+  protected async openPortal(): Promise<void> {
+    this.openingPortal.set(true);
+    this.billingError.set('');
+    try {
+      await this.billingApi.openPortal();
+    } catch (error) {
+      this.billingError.set(error instanceof Error ? error.message : 'Could not open the billing portal.');
+      this.openingPortal.set(false);
     }
   }
 

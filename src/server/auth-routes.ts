@@ -2,27 +2,33 @@ import type { Express, Request, Response } from 'express';
 import { ID, OAuthProvider, Users } from 'node-appwrite';
 import { ADMIN_ROLE, resolveWorkspace, requireWorkspace, type WorkspaceContext } from './access';
 import { createAdminClient, createSessionClient } from './appwrite-admin';
+import { DATABASE_ID, WORKSPACE_COLLECTION_ID } from './billing';
 import { SESSION_COOKIE, errorStatus, originOf, readSessionSecret } from './session';
 
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
-const DATABASE_ID = 'main';
-const WORKSPACE_COLLECTION_ID = 'workspace';
+const TRIAL_PERIOD_DAYS = 14;
 
 /**
  * Creates a brand-new workspace (an Appwrite Team) for a user with no existing one — the outcome of
  * every fresh registration or first-time OAuth sign-in. The creator is always the workspace's first
  * (and, at creation time, only) admin. Runs entirely on the admin/API-key client, so it doesn't need
- * a session to already exist.
+ * a session to already exist. Every new workspace starts on a 14-day Pro trial, no card required —
+ * nothing Stripe-related happens here at all; effectivePlan() (src/server/billing.ts) computes
+ * whether the trial is still active purely from trialEndsAt, until someone actually checks out.
  */
 async function bootstrapWorkspace(admin: ReturnType<typeof createAdminClient>, userId: string, workspaceName: string): Promise<string> {
   const teamId = ID.unique();
+  const trialEndsAt = new Date(Date.now() + TRIAL_PERIOD_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
   await admin.teams.create({ teamId, name: workspaceName });
   await admin.teams.createMembership({ teamId, userId, roles: [ADMIN_ROLE] });
   await admin.databases.createDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, teamId, {
     name: workspaceName,
     description: '',
     timezone: 'UTC',
-    plan: 'free',
+    plan: 'pro',
+    subscriptionStatus: 'trialing',
+    trialEndsAt,
   });
   return teamId;
 }

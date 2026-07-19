@@ -1,11 +1,10 @@
 import type { Express } from 'express';
 import type { Models } from 'node-appwrite';
 import { requireAdmin, requireWorkspace } from './access';
+import { DATABASE_ID, WORKSPACE_COLLECTION_ID } from './billing';
 import { KeyedTtlCache } from './cache';
 import { errorStatus } from './session';
 
-const DATABASE_ID = 'main';
-const WORKSPACE_COLLECTION_ID = 'workspace';
 const NAME_MAX_LENGTH = 200;
 const DESCRIPTION_MAX_LENGTH = 2000;
 const WORKSPACE_CACHE_TTL_MS = 30_000;

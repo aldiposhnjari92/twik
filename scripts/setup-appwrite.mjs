@@ -122,6 +122,11 @@ const WORKSPACE_ATTRIBUTES = [
   { key: 'description', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'description', 2000, false, '') },
   { key: 'timezone', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'timezone', 64, false, 'UTC') },
   { key: 'plan', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'plan', 32, false, 'free') },
+  // Billing fields — all optional at the schema level (see PROJECT_ATTRIBUTES comment above for why).
+  { key: 'subscriptionStatus', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'subscriptionStatus', 32, false) },
+  { key: 'trialEndsAt', create: () => databases.createDatetimeAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'trialEndsAt', false) },
+  { key: 'stripeCustomerId', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'stripeCustomerId', 255, false) },
+  { key: 'stripeSubscriptionId', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'stripeSubscriptionId', 255, false) },
 ];
 
 // One document per workspace (Appwrite Team), keyed by teamId — no longer a single global
@@ -222,10 +227,25 @@ async function ensureNameSearchIndex() {
   console.log('Created "name_idx" fulltext index.');
 }
 
+// Lets the Stripe webhook find the right workspace document from an event that only carries a
+// Stripe customer ID (not our teamId).
+async function ensureStripeCustomerIdIndex() {
+  const { indexes } = await databases.listIndexes(DATABASE_ID, WORKSPACE_COLLECTION_ID);
+  if (indexes.some((index) => index.key === 'stripeCustomerId_idx')) {
+    console.log('"stripeCustomerId_idx" index already exists.');
+    return;
+  }
+
+  await databases.createIndex(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'stripeCustomerId_idx', 'key', ['stripeCustomerId']);
+  await waitForIndexAvailable(WORKSPACE_COLLECTION_ID, 'stripeCustomerId_idx');
+  console.log('Created "stripeCustomerId_idx" index.');
+}
+
 await ensureDatabase();
 await ensureProjectsCollection();
 await ensureNameSearchIndex();
 await ensureStatusIndex();
 await ensureWorkspaceIdIndex();
 await ensureWorkspaceCollection();
+await ensureStripeCustomerIdIndex();
 console.log('Appwrite setup complete.');

@@ -1,9 +1,9 @@
 import type { Express } from 'express';
 import { ID, Permission, Query, Role, type Models } from 'node-appwrite';
 import { requireWorkspace } from './access';
+import { DATABASE_ID, FREE_PROJECT_LIMIT, effectivePlan, getWorkspaceBillingDoc } from './billing';
 import { errorStatus } from './session';
 
-const DATABASE_ID = 'main';
 const PROJECTS_COLLECTION_ID = 'projects';
 const LIST_LIMIT = 100;
 const ITERATION_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -204,6 +204,18 @@ export function registerProjectRoutes(app: Express): void {
     }
 
     try {
+      const billingDoc = await getWorkspaceBillingDoc(databases, workspace.teamId);
+      if (effectivePlan(billingDoc) === 'free') {
+        const { total: projectCount } = await databases.listDocuments(DATABASE_ID, PROJECTS_COLLECTION_ID, [
+          Query.equal('workspaceId', workspace.teamId),
+          Query.limit(1),
+        ]);
+        if (projectCount >= FREE_PROJECT_LIMIT) {
+          res.status(402).json({ message: `The free plan is limited to ${FREE_PROJECT_LIMIT} projects. Upgrade to Pro for unlimited projects.` });
+          return;
+        }
+      }
+
       const doc = await databases.createDocument<ProjectDocument>(
         DATABASE_ID,
         PROJECTS_COLLECTION_ID,

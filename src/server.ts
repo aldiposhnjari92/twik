@@ -10,6 +10,7 @@ import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import { join } from 'node:path';
 import { registerAuthRoutes } from './server/auth-routes';
+import { registerBillingRoutes, registerBillingWebhook } from './server/billing-routes';
 import { registerProjectRoutes } from './server/project-routes';
 import { registerUsersRoutes } from './server/users-routes';
 import { registerWorkspaceRoutes } from './server/workspace-routes';
@@ -35,6 +36,11 @@ app.set('trust proxy', 1);
 // (frameguard, no-sniff, HSTS, etc.) are safe to enable as-is.
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
+
+// Must be registered before express.json() below — Stripe signature verification needs the raw,
+// unparsed request body, which express.json() would otherwise have already consumed.
+registerBillingWebhook(app);
+
 app.use(express.json());
 
 const apiLimiter = rateLimit({
@@ -62,6 +68,7 @@ app.use('/api/auth/recovery', authLimiter);
 app.use('/api/auth/account', authLimiter);
 
 registerAuthRoutes(app);
+registerBillingRoutes(app);
 registerProjectRoutes(app);
 registerUsersRoutes(app);
 registerWorkspaceRoutes(app);
