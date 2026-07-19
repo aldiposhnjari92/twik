@@ -23,7 +23,9 @@
         </button>
       </div>
       @if (isAdmin()) {
-      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openInviteDialog()">
+      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openInviteDialog()"
+        [disabled]="atSeatLimit()" [pTooltip]="atSeatLimit() ? 'Upgrade to Pro to invite more teammates' : ''"
+        tooltipPosition="top">
         <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
         <span pButtonLabel>Invite teammate</span>
       </button>
@@ -37,6 +39,17 @@
 
   @if (errorMessage()) {
   <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  @if (atSeatLimit()) {
+    <p-message severity="warn" class="block w-full">
+      You've reached the Free plan's limit of {{ billing()?.seatLimit }} seats.
+      @if (isAdmin()) {
+        <a routerLink="/settings" [queryParams]="{ tab: 'billing' }" class="font-medium underline">Upgrade to Pro</a> for unlimited seats.
+      } @else {
+        Ask a workspace admin to upgrade for unlimited seats.
+      }
+    </p-message>
   }
 
   @if (viewMode() === 'cards') {

@@ -23,7 +23,9 @@
           <i class="pi pi-th-large" pButtonIcon aria-hidden="true"></i>
         </button>
       </div>
-      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openCreateDialog()">
+      <button pButton type="button" size="small" class="flex-none justify-center" (click)="openCreateDialog()"
+        [disabled]="atProjectLimit()" [pTooltip]="atProjectLimit() ? 'Upgrade to Pro to create more projects' : ''"
+        tooltipPosition="top">
         <i class="pi pi-plus" pButtonIcon aria-hidden="true"></i>
         <span pButtonLabel>New project</span>
       </button>
@@ -37,6 +39,17 @@
 
   @if (errorMessage()) {
   <p-message severity="error" class="block w-full">{{ errorMessage() }}</p-message>
+  }
+
+  @if (atProjectLimit()) {
+    <p-message severity="warn" class="block w-full">
+      You've reached the Free plan's limit of {{ billing()?.projectLimit }} projects.
+      @if (isAdmin()) {
+        <a routerLink="/settings" [queryParams]="{ tab: 'billing' }" class="font-medium underline">Upgrade to Pro</a> for unlimited projects.
+      } @else {
+        Ask a workspace admin to upgrade for unlimited projects.
+      }
+    </p-message>
   }
 
   @if (viewMode() === 'cards') {

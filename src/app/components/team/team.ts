@@ -17,8 +17,10 @@ import { Select } from 'primeng/select';
 import { Skeleton } from 'primeng/skeleton';
 import { Tag } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
+import { Tooltip } from 'primeng/tooltip';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth/auth';
+import { Billing, BillingSummary } from '../../billing/billing';
 import { Notifications } from '../../notifications/notifications';
 import { Project, Projects } from '../../projects/projects';
 import { setViewMode } from '../../state/ui/ui.actions';
@@ -89,6 +91,7 @@ function countProjectsPerUser(projects: Project[]): Map<string, number> {
     Skeleton,
     Tag,
     TableModule,
+    Tooltip,
     EmptyState,
     DatePipe,
   ],
@@ -98,6 +101,7 @@ function countProjectsPerUser(projects: Project[]): Map<string, number> {
 export class Team {
   private readonly usersApi = inject(Users);
   private readonly projectsApi = inject(Projects);
+  private readonly billingApi = inject(Billing);
   private readonly notifications = inject(Notifications);
   private readonly auth = inject(Auth);
   private readonly injector = inject(Injector);
@@ -116,6 +120,12 @@ export class Team {
   protected readonly roleUpdatingId = signal<string | null>(null);
   protected readonly viewMode = toSignal(this.store.select(selectTeamViewMode), { initialValue: 'table' as const });
   protected readonly searchTerm = signal('');
+
+  protected readonly billing = signal<BillingSummary | null>(null);
+  protected readonly atSeatLimit = computed(() => {
+    const b = this.billing();
+    return !!b && b.seatLimit !== null && b.seatCount >= b.seatLimit;
+  });
 
   protected setViewMode(mode: 'table' | 'cards'): void {
     this.store.dispatch(setViewMode({ page: 'team', mode }));
@@ -146,6 +156,15 @@ export class Team {
 
   constructor() {
     this.load();
+    this.loadBilling();
+  }
+
+  private async loadBilling(): Promise<void> {
+    try {
+      this.billing.set(await this.billingApi.get());
+    } catch {
+      // Non-critical: the plan-limit banner and button just don't show if this fails.
+    }
   }
 
   protected async load(): Promise<void> {
@@ -265,10 +284,13 @@ export class Team {
       const current = this.invitee();
       const created = await this.usersApi.invite({ ...current, department: current.department as Department });
       this.members.update((list) => [...list, created].sort((a, b) => a.name.localeCompare(b.name)));
+      this.billing.update((b) => (b ? { ...b, seatCount: b.seatCount + 1 } : b));
       this.notifications.success('Invitation sent', `${created.name} will receive an email to set up their account.`);
       this.closeInviteDialog();
     } catch (error) {
-      this.inviteError.set(error instanceof Error ? error.message : 'Could not invite teammate.');
+      const message = error instanceof Error ? error.message : 'Could not invite teammate.';
+      this.inviteError.set(message);
+      this.notifications.error('Could not invite teammate', message);
     } finally {
       this.submitting.set(false);
     }
@@ -371,6 +393,7 @@ export class Team {
     try {
       await this.usersApi.remove(member.id);
       this.applyMemberRemoval(member.id);
+      this.billing.update((b) => (b ? { ...b, seatCount: Math.max(0, b.seatCount - 1) } : b));
       this.notifications.success('Teammate removed', `"${member.name}" was removed from the workspace.`);
     } catch (error) {
       this.notifications.error(

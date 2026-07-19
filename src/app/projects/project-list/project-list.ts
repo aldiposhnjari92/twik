@@ -19,9 +19,11 @@ import { Skeleton } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { Tag } from 'primeng/tag';
 import { Textarea } from 'primeng/textarea';
+import { Tooltip } from 'primeng/tooltip';
 import { EmptyState } from '../../components/empty-state/empty-state';
 import { Notifications } from '../../notifications/notifications';
 import { Auth } from '../../auth/auth';
+import { Billing, BillingSummary } from '../../billing/billing';
 import { setViewMode } from '../../state/ui/ui.actions';
 import { selectProjectsViewMode } from '../../state/ui/ui.selectors';
 import { Users, WorkspaceUser } from '../../users/users';
@@ -83,6 +85,7 @@ function emptyProject() {
     TableModule,
     Tag,
     Textarea,
+    Tooltip,
     EmptyState,
     DatePipe,
   ],
@@ -92,16 +95,24 @@ function emptyProject() {
 export class ProjectList {
   private readonly projectsApi = inject(Projects);
   private readonly usersApi = inject(Users);
+  private readonly billingApi = inject(Billing);
   private readonly notifications = inject(Notifications);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly auth = inject(Auth);
   private readonly store = inject(Store);
 
+  protected readonly isAdmin = this.auth.isAdmin;
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
   protected readonly viewMode = toSignal(this.store.select(selectProjectsViewMode), { initialValue: 'table' as const });
   protected readonly searchTerm = signal('');
+
+  protected readonly billing = signal<BillingSummary | null>(null);
+  protected readonly atProjectLimit = computed(() => {
+    const b = this.billing();
+    return !!b && b.projectLimit !== null && b.projectCount >= b.projectLimit;
+  });
 
   protected setViewMode(mode: 'table' | 'cards'): void {
     this.store.dispatch(setViewMode({ page: 'projects', mode }));
@@ -178,6 +189,15 @@ export class ProjectList {
 
   constructor() {
     this.load();
+    this.loadBilling();
+  }
+
+  private async loadBilling(): Promise<void> {
+    try {
+      this.billing.set(await this.billingApi.get());
+    } catch {
+      // Non-critical: the plan-limit banner and button just don't show if this fails.
+    }
   }
 
   protected async load(): Promise<void> {
@@ -221,6 +241,7 @@ export class ProjectList {
     try {
       await this.projectsApi.remove(project.id);
       this.projects.update((list) => list.filter((p) => p.id !== project.id));
+      this.billing.update((b) => (b ? { ...b, projectCount: Math.max(0, b.projectCount - 1) } : b));
       this.notifications.success('Project deleted', `"${project.name}" was deleted.`);
     } catch (error) {
       this.notifications.error('Could not delete project', error instanceof Error ? error.message : 'Please try again.');
@@ -297,10 +318,13 @@ export class ProjectList {
         assigneeName: this.assigneeName(),
       });
       this.projects.update((list) => [created, ...list]);
+      this.billing.update((b) => (b ? { ...b, projectCount: b.projectCount + 1 } : b));
       this.notifications.success('Project created', `"${created.name}" is ready to go.`);
       this.closeCreateDialog();
     } catch (error) {
-      this.createError.set(error instanceof Error ? error.message : 'Could not create the project.');
+      const message = error instanceof Error ? error.message : 'Could not create the project.';
+      this.createError.set(message);
+      this.notifications.error('Could not create project', message);
     } finally {
       this.submitting.set(false);
     }
