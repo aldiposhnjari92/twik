@@ -6,6 +6,7 @@ export interface AuthUser {
   name: string;
   email: string;
   isAdmin: boolean;
+  workspaceId: string;
 }
 
 export interface UserSession {
@@ -54,7 +55,7 @@ export class Auth {
         return false;
       }
       const data = await response.json();
-      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin });
+      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin, workspaceId: data.workspaceId });
       return true;
     } catch {
       this.user.set(null);
@@ -78,7 +79,7 @@ export class Auth {
       throw new Error(await readError(response, 'Registration failed.'));
     }
     const data = await response.json();
-    this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin });
+    this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin, workspaceId: data.workspaceId });
   }
 
   loginWithGoogle(): void {
@@ -96,7 +97,7 @@ export class Auth {
         return false;
       }
       const data = await response.json();
-      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin });
+      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin, workspaceId: data.workspaceId });
       return true;
     } catch {
       return false;
@@ -195,7 +196,7 @@ export class Auth {
         return;
       }
       const data = await response.json();
-      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin });
+      this.user.set({ id: data.id, name: data.name, email: data.email, isAdmin: !!data.isAdmin, workspaceId: data.workspaceId });
     } catch {
       this.user.set(null);
     }

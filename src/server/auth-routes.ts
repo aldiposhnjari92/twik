@@ -1,20 +1,34 @@
 import type { Express, Request, Response } from 'express';
-import { ID, OAuthProvider, Query, Users, type Client } from 'node-appwrite';
-import { ADMIN_LABEL, isAdmin } from './access';
+import { ID, OAuthProvider, Users } from 'node-appwrite';
+import { ADMIN_ROLE, resolveWorkspace, requireWorkspace, type WorkspaceContext } from './access';
 import { createAdminClient, createSessionClient } from './appwrite-admin';
 import { SESSION_COOKIE, errorStatus, originOf, readSessionSecret } from './session';
 
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+const DATABASE_ID = 'main';
+const WORKSPACE_COLLECTION_ID = 'workspace';
 
-/** The very first account in the workspace becomes an admin automatically so someone can manage the team. */
-async function bootstrapFirstAdmin(client: Client, userId: string): Promise<boolean> {
-  const users = new Users(client);
-  const { total } = await users.list({ queries: [Query.limit(1)] });
-  if (total <= 1) {
-    await users.updateLabels({ userId, labels: [ADMIN_LABEL] });
-    return true;
-  }
-  return false;
+/**
+ * Creates a brand-new workspace (an Appwrite Team) for a user with no existing one — the outcome of
+ * every fresh registration or first-time OAuth sign-in. The creator is always the workspace's first
+ * (and, at creation time, only) admin. Runs entirely on the admin/API-key client, so it doesn't need
+ * a session to already exist.
+ */
+async function bootstrapWorkspace(admin: ReturnType<typeof createAdminClient>, userId: string, workspaceName: string): Promise<string> {
+  const teamId = ID.unique();
+  await admin.teams.create({ teamId, name: workspaceName });
+  await admin.teams.createMembership({ teamId, userId, roles: [ADMIN_ROLE] });
+  await admin.databases.createDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, teamId, {
+    name: workspaceName,
+    description: '',
+    timezone: 'UTC',
+    plan: 'free',
+  });
+  return teamId;
+}
+
+function userDto(context: WorkspaceContext) {
+  return { id: context.user.$id, name: context.user.name, email: context.user.email, isAdmin: context.isAdmin, workspaceId: context.teamId };
 }
 
 function setSessionCookie(req: Request, res: Response, secret: string): void {
@@ -45,12 +59,19 @@ export function registerAuthRoutes(app: Express): void {
     }
 
     try {
-      const { client, account } = createAdminClient();
-      const created = await account.create({ userId: ID.unique(), email, password, name });
-      const madeAdmin = await bootstrapFirstAdmin(client, created.$id);
-      const session = await account.createEmailPasswordSession({ email, password });
+      const admin = createAdminClient();
+      const created = await admin.account.create({ userId: ID.unique(), email, password, name });
+      await bootstrapWorkspace(admin, created.$id, `${name}'s Workspace`);
+
+      const session = await admin.account.createEmailPasswordSession({ email, password });
+      const context = await resolveWorkspace(session.secret);
+      if (!context) {
+        res.status(500).json({ message: 'Your account was created, but the workspace could not be set up. Please try logging in.' });
+        return;
+      }
+
       setSessionCookie(req, res, session.secret);
-      res.json({ id: created.$id, name, email, isAdmin: madeAdmin });
+      res.json(userDto(context));
     } catch (error) {
       res.status(errorStatus(error)).json({
         message: error instanceof Error ? error.message : 'Registration failed.',
@@ -68,10 +89,14 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const { account: adminAccount } = createAdminClient();
       const session = await adminAccount.createEmailPasswordSession({ email, password });
-      const { account } = createSessionClient(session.secret);
-      const user = await account.get();
+      const context = await resolveWorkspace(session.secret);
+      if (!context) {
+        res.status(403).json({ message: "Your account isn't part of a workspace." });
+        return;
+      }
+
       setSessionCookie(req, res, session.secret);
-      res.json({ id: user.$id, name: user.name, email: user.email, isAdmin: isAdmin(user) });
+      res.json(userDto(context));
     } catch {
       res.status(401).json({ message: 'Invalid email or password.' });
     }
@@ -106,8 +131,13 @@ export function registerAuthRoutes(app: Express): void {
 
     try {
       const { account } = createSessionClient(secret);
-      const user = await account.updateName({ name });
-      res.json({ id: user.$id, name: user.name, email: user.email, isAdmin: isAdmin(user) });
+      await account.updateName({ name });
+      const context = await resolveWorkspace(secret);
+      if (!context) {
+        res.status(401).json({ message: 'Not authenticated.' });
+        return;
+      }
+      res.json(userDto(context));
     } catch (error) {
       res.status(errorStatus(error)).json({
         message: error instanceof Error ? error.message : 'Could not update your name.',
@@ -266,20 +296,9 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   app.get('/api/auth/me', async (req, res) => {
-    const secret = readSessionSecret(req);
-    if (!secret) {
-      res.status(401).json({ message: 'Not authenticated.' });
-      return;
-    }
-
-    try {
-      const { account } = createSessionClient(secret);
-      const user = await account.get();
-      res.json({ id: user.$id, name: user.name, email: user.email, isAdmin: isAdmin(user) });
-    } catch {
-      clearSessionCookie(req, res);
-      res.status(401).json({ message: 'Not authenticated.' });
-    }
+    const context = await requireWorkspace(req, res);
+    if (!context) return;
+    res.json(userDto(context));
   });
 
   app.get('/api/auth/google', async (req, res) => {
@@ -305,9 +324,22 @@ export function registerAuthRoutes(app: Express): void {
     }
 
     try {
-      const { client, account } = createAdminClient();
-      const session = await account.createSession({ userId, secret });
-      await bootstrapFirstAdmin(client, userId);
+      const admin = createAdminClient();
+      const session = await admin.account.createSession({ userId, secret });
+
+      let context = await resolveWorkspace(session.secret);
+      if (!context) {
+        // First-time identity for this Google account — Appwrite auto-created the user before
+        // redirecting here. Give them their own new workspace, same as email/password registration.
+        const googleUser = await new Users(admin.client).get({ userId });
+        await bootstrapWorkspace(admin, userId, `${googleUser.name}'s Workspace`);
+        context = await resolveWorkspace(session.secret);
+      }
+      if (!context) {
+        res.redirect('/login?error=oauth-failed');
+        return;
+      }
+
       setSessionCookie(req, res, session.secret);
       res.redirect('/dashboard');
     } catch {

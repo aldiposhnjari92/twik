@@ -19,7 +19,6 @@ const PROJECT_ID = 'twik';
 const DATABASE_ID = 'main';
 const PROJECTS_COLLECTION_ID = 'projects';
 const WORKSPACE_COLLECTION_ID = 'workspace';
-const WORKSPACE_DOCUMENT_ID = 'settings';
 
 const client = new Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID).setKey(apiKey);
 const databases = new Databases(client);
@@ -70,23 +69,35 @@ const PROJECT_ATTRIBUTES = [
   { key: 'iteration', create: () => databases.createStringAttribute(DATABASE_ID, PROJECTS_COLLECTION_ID, 'iteration', 7, false) },
   { key: 'assigneeId', create: () => databases.createStringAttribute(DATABASE_ID, PROJECTS_COLLECTION_ID, 'assigneeId', 64, false) },
   { key: 'assigneeName', create: () => databases.createStringAttribute(DATABASE_ID, PROJECTS_COLLECTION_ID, 'assigneeName', 128, false) },
+  // Optional at the schema level (not required) even though the app always sets it on create: pre-existing
+  // documents from before multi-tenancy predate this attribute, and Appwrite won't backfill them — the
+  // one-time migrate-to-workspaces.mjs script does that instead. See PROJECT_ATTRIBUTES comment above.
+  { key: 'workspaceId', create: () => databases.createStringAttribute(DATABASE_ID, PROJECTS_COLLECTION_ID, 'workspaceId', 36, false) },
 ];
 
+// Read/update/delete isolation between workspaces is enforced per-document (Role.team(teamId)
+// permissions set at create time), which requires documentSecurity: true — Appwrite otherwise ignores
+// per-document permissions in favor of the collection-level set. `create` has no document to scope to
+// yet, so it stays a collection-level grant to any authenticated user; the Express server (never the
+// browser directly) is what actually decides which workspace a create is allowed to attach to. Asserted
+// on every run so this also self-heals collections created before this switch (the pre-multi-tenancy schema).
 async function ensureProjectsCollection() {
   try {
     await databases.getCollection(DATABASE_ID, PROJECTS_COLLECTION_ID);
     console.log(`Collection "${PROJECTS_COLLECTION_ID}" already exists.`);
   } catch (error) {
     if (error.code !== 404) throw error;
-    await databases.createCollection(
-      DATABASE_ID,
-      PROJECTS_COLLECTION_ID,
-      'Projects',
-      [Permission.read(Role.users()), Permission.create(Role.users()), Permission.update(Role.users()), Permission.delete(Role.users())],
-      false,
-    );
+    await databases.createCollection(DATABASE_ID, PROJECTS_COLLECTION_ID, 'Projects', [Permission.create(Role.users())], true);
     console.log(`Created collection "${PROJECTS_COLLECTION_ID}".`);
   }
+
+  await databases.updateCollection({
+    databaseId: DATABASE_ID,
+    collectionId: PROJECTS_COLLECTION_ID,
+    name: 'Projects',
+    permissions: [Permission.create(Role.users())],
+    documentSecurity: true,
+  });
 
   const { attributes: existingAttributes } = await databases.listAttributes(DATABASE_ID, PROJECTS_COLLECTION_ID);
   const existingKeys = new Set(existingAttributes.map((a) => a.key));
@@ -110,23 +121,28 @@ const WORKSPACE_ATTRIBUTES = [
   { key: 'name', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'name', 200, true) },
   { key: 'description', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'description', 2000, false, '') },
   { key: 'timezone', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'timezone', 64, false, 'UTC') },
+  { key: 'plan', create: () => databases.createStringAttribute(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'plan', 32, false, 'free') },
 ];
 
+// One document per workspace (Appwrite Team), keyed by teamId — no longer a single global
+// singleton document, so this function only provisions the collection/attributes, not any document.
 async function ensureWorkspaceCollection() {
   try {
     await databases.getCollection(DATABASE_ID, WORKSPACE_COLLECTION_ID);
     console.log(`Collection "${WORKSPACE_COLLECTION_ID}" already exists.`);
   } catch (error) {
     if (error.code !== 404) throw error;
-    await databases.createCollection(
-      DATABASE_ID,
-      WORKSPACE_COLLECTION_ID,
-      'Workspace',
-      [Permission.read(Role.users()), Permission.update(Role.users())],
-      false,
-    );
+    await databases.createCollection(DATABASE_ID, WORKSPACE_COLLECTION_ID, 'Workspace', [], true);
     console.log(`Created collection "${WORKSPACE_COLLECTION_ID}".`);
   }
+
+  await databases.updateCollection({
+    databaseId: DATABASE_ID,
+    collectionId: WORKSPACE_COLLECTION_ID,
+    name: 'Workspace',
+    permissions: [],
+    documentSecurity: true,
+  });
 
   const { attributes: existingAttributes } = await databases.listAttributes(DATABASE_ID, WORKSPACE_COLLECTION_ID);
   const existingKeys = new Set(existingAttributes.map((a) => a.key));
@@ -141,19 +157,6 @@ async function ensureWorkspaceCollection() {
     console.log('All workspace attributes are available.');
   } else {
     console.log('All workspace attributes already exist.');
-  }
-
-  try {
-    await databases.getDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, WORKSPACE_DOCUMENT_ID);
-    console.log('Workspace settings document already exists.');
-  } catch (error) {
-    if (error.code !== 404) throw error;
-    await databases.createDocument(DATABASE_ID, WORKSPACE_COLLECTION_ID, WORKSPACE_DOCUMENT_ID, {
-      name: 'Twik',
-      description: '',
-      timezone: 'UTC',
-    });
-    console.log('Created default workspace settings document.');
   }
 }
 
@@ -183,6 +186,19 @@ async function ensureStatusIndex() {
   console.log('Created "status_idx" index.');
 }
 
+// Speeds up (and is required for) scoping every projects query to the caller's workspace.
+async function ensureWorkspaceIdIndex() {
+  const { indexes } = await databases.listIndexes(DATABASE_ID, PROJECTS_COLLECTION_ID);
+  if (indexes.some((index) => index.key === 'workspaceId_idx')) {
+    console.log('"workspaceId_idx" index already exists.');
+    return;
+  }
+
+  await databases.createIndex(DATABASE_ID, PROJECTS_COLLECTION_ID, 'workspaceId_idx', 'key', ['workspaceId']);
+  await waitForIndexAvailable(PROJECTS_COLLECTION_ID, 'workspaceId_idx');
+  console.log('Created "workspaceId_idx" index.');
+}
+
 // Query.search() requires a `fulltext` index; a plain `key` index silently fails at query time.
 async function ensureNameSearchIndex() {
   const { indexes } = await databases.listIndexes(DATABASE_ID, PROJECTS_COLLECTION_ID);
@@ -210,5 +226,6 @@ await ensureDatabase();
 await ensureProjectsCollection();
 await ensureNameSearchIndex();
 await ensureStatusIndex();
+await ensureWorkspaceIdIndex();
 await ensureWorkspaceCollection();
 console.log('Appwrite setup complete.');

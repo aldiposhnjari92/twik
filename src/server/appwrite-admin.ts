@@ -1,4 +1,4 @@
-import { Account, Client, Databases } from 'node-appwrite';
+import { Account, Client, Databases, Teams } from 'node-appwrite';
 
 const appwriteConfig = {
   endpoint: 'https://fra.cloud.appwrite.io/v1',
@@ -15,7 +15,7 @@ const appwriteConfig = {
  * "missing scopes" since the key isn't granted account-level scope. Use `createSessionClient`
  * for anything that needs to act as the signed-in user.
  */
-export function createAdminClient(): { client: Client; account: Account } {
+export function createAdminClient(): { client: Client; account: Account; databases: Databases; teams: Teams } {
   const apiKey = process.env['APPWRITE_API_KEY'];
   if (!apiKey) {
     throw new Error('APPWRITE_API_KEY environment variable is not set.');
@@ -23,12 +23,12 @@ export function createAdminClient(): { client: Client; account: Account } {
 
   const client = new Client().setEndpoint(appwriteConfig.endpoint).setProject(appwriteConfig.projectId).setKey(apiKey);
 
-  return { client, account: new Account(client) };
+  return { client, account: new Account(client), databases: new Databases(client), teams: new Teams(client) };
 }
 
 /** A client authenticated as the signed-in user via their session secret, no API key attached. */
-export function createSessionClient(secret: string): { client: Client; account: Account; databases: Databases } {
+export function createSessionClient(secret: string): { client: Client; account: Account; databases: Databases; teams: Teams } {
   const client = new Client().setEndpoint(appwriteConfig.endpoint).setProject(appwriteConfig.projectId).setSession(secret);
 
-  return { client, account: new Account(client), databases: new Databases(client) };
+  return { client, account: new Account(client), databases: new Databases(client), teams: new Teams(client) };
 }

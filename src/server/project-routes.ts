@@ -1,8 +1,7 @@
-import type { Express, Request, Response } from 'express';
-import { ID, Query, type Models } from 'node-appwrite';
-import { isAdmin } from './access';
-import { createSessionClient } from './appwrite-admin';
-import { errorStatus, readSessionSecret } from './session';
+import type { Express } from 'express';
+import { ID, Permission, Query, Role, type Models } from 'node-appwrite';
+import { requireWorkspace } from './access';
+import { errorStatus } from './session';
 
 const DATABASE_ID = 'main';
 const PROJECTS_COLLECTION_ID = 'projects';
@@ -15,6 +14,7 @@ interface ProjectDocument extends Models.Document {
   name: string;
   description: string;
   status: ProjectStatus;
+  workspaceId: string;
   ownerId: string;
   ownerName: string;
   startDate: string | null;
@@ -56,15 +56,6 @@ function toDto(doc: ProjectDocument): ProjectDto {
     createdAt: doc.$createdAt,
     updatedAt: doc.$updatedAt,
   };
-}
-
-function requireSession(req: Request, res: Response): ReturnType<typeof createSessionClient> | undefined {
-  const secret = readSessionSecret(req);
-  if (!secret) {
-    res.status(401).json({ message: 'Not authenticated.' });
-    return undefined;
-  }
-  return createSessionClient(secret);
 }
 
 function isValidIsoDate(value: unknown): value is string {
@@ -140,13 +131,14 @@ function parseProjectFields(body: unknown, target: ProjectWriteFields): string |
 
 export function registerProjectRoutes(app: Express): void {
   app.get('/api/projects', async (req, res) => {
-    const session = requireSession(req, res);
-    if (!session) return;
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
+    const { databases } = workspace;
 
     const search = typeof req.query['search'] === 'string' ? req.query['search'].trim() : '';
     const status = req.query['status'];
 
-    const queries = [Query.orderDesc('$createdAt'), Query.limit(LIST_LIMIT)];
+    const queries = [Query.equal('workspaceId', workspace.teamId), Query.orderDesc('$createdAt'), Query.limit(LIST_LIMIT)];
     if (search) {
       queries.push(Query.search('name', search));
     }
@@ -155,7 +147,7 @@ export function registerProjectRoutes(app: Express): void {
     }
 
     try {
-      const result = await session.databases.listDocuments<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, queries);
+      const result = await databases.listDocuments<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, queries);
       res.json({ projects: result.documents.map(toDto), total: result.total });
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -165,11 +157,12 @@ export function registerProjectRoutes(app: Express): void {
   });
 
   app.get('/api/projects/:id', async (req, res) => {
-    const session = requireSession(req, res);
-    if (!session) return;
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
+    const { databases } = workspace;
 
     try {
-      const doc = await session.databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
+      const doc = await databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
       res.json(toDto(doc));
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -179,8 +172,9 @@ export function registerProjectRoutes(app: Express): void {
   });
 
   app.post('/api/projects', async (req, res) => {
-    const session = requireSession(req, res);
-    if (!session) return;
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
+    const { databases } = workspace;
 
     const fields: ProjectWriteFields = {};
     const parseError = parseProjectFields(req.body, fields);
@@ -210,19 +204,29 @@ export function registerProjectRoutes(app: Express): void {
     }
 
     try {
-      const user = await session.account.get();
-      const doc = await session.databases.createDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, ID.unique(), {
-        name: fields.name,
-        description: fields.description ?? '',
-        status: 'active',
-        ownerId: user.$id,
-        ownerName: user.name,
-        startDate: fields.startDate,
-        deadline: fields.deadline,
-        iteration: fields.iteration,
-        assigneeId: fields.assigneeId ?? null,
-        assigneeName: fields.assigneeName ?? null,
-      });
+      const doc = await databases.createDocument<ProjectDocument>(
+        DATABASE_ID,
+        PROJECTS_COLLECTION_ID,
+        ID.unique(),
+        {
+          name: fields.name,
+          description: fields.description ?? '',
+          status: 'active',
+          workspaceId: workspace.teamId,
+          ownerId: workspace.user.$id,
+          ownerName: workspace.user.name,
+          startDate: fields.startDate,
+          deadline: fields.deadline,
+          iteration: fields.iteration,
+          assigneeId: fields.assigneeId ?? null,
+          assigneeName: fields.assigneeName ?? null,
+        },
+        [
+          Permission.read(Role.team(workspace.teamId)),
+          Permission.update(Role.team(workspace.teamId)),
+          Permission.delete(Role.team(workspace.teamId)),
+        ],
+      );
       res.status(201).json(toDto(doc));
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -232,8 +236,9 @@ export function registerProjectRoutes(app: Express): void {
   });
 
   app.patch('/api/projects/:id', async (req, res) => {
-    const session = requireSession(req, res);
-    if (!session) return;
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
+    const { databases } = workspace;
 
     const fields: ProjectWriteFields = {};
     const parseError = parseProjectFields(req.body, fields);
@@ -243,10 +248,9 @@ export function registerProjectRoutes(app: Express): void {
     }
 
     try {
-      const current = await session.databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
+      const current = await databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
 
-      const caller = await session.account.get();
-      const canModify = isAdmin(caller) || caller.$id === current.ownerId || caller.$id === current.assigneeId;
+      const canModify = workspace.isAdmin || workspace.user.$id === current.ownerId || workspace.user.$id === current.assigneeId;
       if (!canModify) {
         res.status(403).json({ message: 'Only the owner, the assignee, or a workspace admin can edit this project.' });
         return;
@@ -261,7 +265,7 @@ export function registerProjectRoutes(app: Express): void {
         }
       }
 
-      const doc = await session.databases.updateDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id'], fields);
+      const doc = await databases.updateDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id'], fields);
       res.json(toDto(doc));
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -271,20 +275,20 @@ export function registerProjectRoutes(app: Express): void {
   });
 
   app.delete('/api/projects/:id', async (req, res) => {
-    const session = requireSession(req, res);
-    if (!session) return;
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
+    const { databases } = workspace;
 
     try {
-      const current = await session.databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
+      const current = await databases.getDocument<ProjectDocument>(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
 
-      const caller = await session.account.get();
-      const canDelete = isAdmin(caller) || caller.$id === current.ownerId;
+      const canDelete = workspace.isAdmin || workspace.user.$id === current.ownerId;
       if (!canDelete) {
         res.status(403).json({ message: 'Only the owner or a workspace admin can delete this project.' });
         return;
       }
 
-      await session.databases.deleteDocument(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
+      await databases.deleteDocument(DATABASE_ID, PROJECTS_COLLECTION_ID, req.params['id']);
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({

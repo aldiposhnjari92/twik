@@ -1,9 +1,9 @@
 import type { Express } from 'express';
 import { ID, Query, Users } from 'node-appwrite';
-import { ADMIN_LABEL, isAdmin, requireAdmin } from './access';
+import { ADMIN_ROLE, MEMBER_ROLE, requireAdmin, requireWorkspace } from './access';
 import { createAdminClient } from './appwrite-admin';
-import { TtlCache } from './cache';
-import { errorStatus, originOf, readSessionSecret } from './session';
+import { KeyedTtlCache } from './cache';
+import { errorStatus, originOf } from './session';
 
 const LIST_LIMIT = 100;
 const USERS_CACHE_TTL_MS = 15_000;
@@ -12,6 +12,7 @@ const DEPARTMENTS = ['Engineering', 'Design', 'Product', 'Marketing', 'Sales', '
 
 interface UserDto {
   id: string;
+  membershipId: string;
   name: string;
   email: string;
   department: string | null;
@@ -26,35 +27,49 @@ function departmentOf(prefs: Record<string, unknown>): string | null {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const usersCache = new TtlCache<UserDto[]>(USERS_CACHE_TTL_MS);
+// Keyed by teamId — one member list per workspace, never a single global slot.
+const usersCache = new KeyedTtlCache<UserDto[]>(USERS_CACHE_TTL_MS);
+
+/** Resolves the target's membership within the caller's workspace, or `undefined` if they're not a member of it. */
+async function findMembership(teams: ReturnType<typeof createAdminClient>['teams'], teamId: string, userId: string) {
+  const { memberships } = await teams.listMemberships({ teamId, queries: [Query.equal('userId', userId)] });
+  return memberships[0];
+}
+
+async function countAdmins(teams: ReturnType<typeof createAdminClient>['teams'], teamId: string): Promise<number> {
+  const { total } = await teams.listMemberships({ teamId, queries: [Query.contains('roles', [ADMIN_ROLE]), Query.limit(2)] });
+  return total;
+}
 
 export function registerUsersRoutes(app: Express): void {
   app.get('/api/users', async (req, res) => {
-    const secret = readSessionSecret(req);
-    if (!secret) {
-      res.status(401).json({ message: 'Not authenticated.' });
-      return;
-    }
+    const workspace = await requireWorkspace(req, res);
+    if (!workspace) return;
 
-    const cached = usersCache.get();
+    const cached = usersCache.get(workspace.teamId);
     if (cached) {
       res.json({ users: cached });
       return;
     }
 
     try {
-      const { client } = createAdminClient();
+      const { client, teams } = createAdminClient();
       const users = new Users(client);
-      const result = await users.list({ queries: [Query.limit(LIST_LIMIT), Query.orderAsc('name')] });
-      const dtos: UserDto[] = result.users.map((user) => ({
-        id: user.$id,
-        name: user.name,
-        email: user.email,
-        department: departmentOf(user.prefs),
-        isAdmin: isAdmin(user),
-        createdAt: user.$createdAt,
+
+      const { memberships } = await teams.listMemberships({ teamId: workspace.teamId, queries: [Query.limit(LIST_LIMIT)] });
+      const accounts = await Promise.all(memberships.map((membership) => users.get({ userId: membership.userId })));
+
+      const dtos: UserDto[] = memberships.map((membership, index) => ({
+        id: membership.userId,
+        membershipId: membership.$id,
+        name: membership.userName,
+        email: membership.userEmail,
+        department: departmentOf(accounts[index].prefs),
+        isAdmin: membership.roles.includes(ADMIN_ROLE),
+        createdAt: membership.$createdAt,
       }));
-      usersCache.set(dtos);
+
+      usersCache.set(workspace.teamId, dtos);
       res.json({ users: dtos });
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -64,7 +79,8 @@ export function registerUsersRoutes(app: Express): void {
   });
 
   app.post('/api/users', async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    const workspace = await requireAdmin(req, res);
+    if (!workspace) return;
 
     const { name, email, department } = req.body ?? {};
     if (!name || !email) {
@@ -77,14 +93,18 @@ export function registerUsersRoutes(app: Express): void {
     }
 
     try {
-      const { client, account } = createAdminClient();
+      const { client, account, teams } = createAdminClient();
       const users = new Users(client);
       const created = await users.create({ userId: ID.unique(), email, name });
       await users.updatePrefs({ userId: created.$id, prefs: { department } });
       await account.createRecovery({ email, url: `${originOf(req)}/reset-password` });
-      usersCache.clear();
+      // Server-initiated with an existing userId completes immediately — no separate invitation email.
+      const membership = await teams.createMembership({ teamId: workspace.teamId, userId: created.$id, roles: [MEMBER_ROLE] });
+
+      usersCache.clear(workspace.teamId);
       res.status(201).json({
         id: created.$id,
+        membershipId: membership.$id,
         name: created.name,
         email: created.email,
         department,
@@ -99,7 +119,8 @@ export function registerUsersRoutes(app: Express): void {
   });
 
   app.patch('/api/users/:id', async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    const workspace = await requireAdmin(req, res);
+    if (!workspace) return;
 
     const { name, email, department } = req.body ?? {};
 
@@ -121,9 +142,15 @@ export function registerUsersRoutes(app: Express): void {
     }
 
     try {
-      const { client } = createAdminClient();
-      const users = new Users(client);
+      const { client, teams } = createAdminClient();
 
+      const membership = await findMembership(teams, workspace.teamId, req.params.id);
+      if (!membership) {
+        res.status(404).json({ message: 'That teammate is not in your workspace.' });
+        return;
+      }
+
+      const users = new Users(client);
       if (name !== undefined) {
         await users.updateName({ userId: req.params.id, name: name.trim() });
       }
@@ -134,7 +161,7 @@ export function registerUsersRoutes(app: Express): void {
         await users.updatePrefs({ userId: req.params.id, prefs: { department } });
       }
 
-      usersCache.clear();
+      usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -144,29 +171,33 @@ export function registerUsersRoutes(app: Express): void {
   });
 
   app.delete('/api/users/:id', async (req, res) => {
-    const caller = await requireAdmin(req, res);
-    if (!caller) return;
+    const workspace = await requireAdmin(req, res);
+    if (!workspace) return;
 
-    if (req.params.id === caller.$id) {
+    if (req.params.id === workspace.user.$id) {
       res.status(400).json({ message: "You can't remove your own account from here. Use Settings → Danger zone instead." });
       return;
     }
 
     try {
-      const { client } = createAdminClient();
-      const users = new Users(client);
+      const { teams } = createAdminClient();
 
-      const target = await users.get({ userId: req.params.id });
-      if (isAdmin(target)) {
-        const { total } = await users.list({ queries: [Query.contains('labels', [ADMIN_LABEL]), Query.limit(2)] });
-        if (total <= 1) {
-          res.status(400).json({ message: 'The workspace needs at least one admin.' });
-          return;
-        }
+      const membership = await findMembership(teams, workspace.teamId, req.params.id);
+      if (!membership) {
+        res.status(404).json({ message: 'That teammate is not in your workspace.' });
+        return;
       }
 
-      await users.delete({ userId: req.params.id });
-      usersCache.clear();
+      if (membership.roles.includes(ADMIN_ROLE) && (await countAdmins(teams, workspace.teamId)) <= 1) {
+        res.status(400).json({ message: 'The workspace needs at least one admin.' });
+        return;
+      }
+
+      // Revokes access to this workspace only — the person's Appwrite account (and any other
+      // workspace they might belong to) is untouched. Account deletion is a self-service action
+      // under Settings → Danger zone, not something removing a teammate should do.
+      await teams.deleteMembership({ teamId: workspace.teamId, membershipId: membership.$id });
+      usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({
@@ -176,8 +207,8 @@ export function registerUsersRoutes(app: Express): void {
   });
 
   app.patch('/api/users/:id/role', async (req, res) => {
-    const caller = await requireAdmin(req, res);
-    if (!caller) return;
+    const workspace = await requireAdmin(req, res);
+    if (!workspace) return;
 
     const { isAdmin: makeAdmin } = req.body ?? {};
     if (typeof makeAdmin !== 'boolean') {
@@ -186,26 +217,26 @@ export function registerUsersRoutes(app: Express): void {
     }
 
     try {
-      const { client } = createAdminClient();
-      const users = new Users(client);
+      const { teams } = createAdminClient();
 
-      if (!makeAdmin) {
-        const targetIsCurrentlyAdmin = (await users.get({ userId: req.params.id })).labels.includes(ADMIN_LABEL);
-        const { total } = targetIsCurrentlyAdmin
-          ? await users.list({ queries: [Query.contains('labels', [ADMIN_LABEL]), Query.limit(2)] })
-          : { total: 0 };
-        if (targetIsCurrentlyAdmin && total <= 1) {
-          res.status(400).json({ message: 'The workspace needs at least one admin.' });
-          return;
-        }
+      const membership = await findMembership(teams, workspace.teamId, req.params.id);
+      if (!membership) {
+        res.status(404).json({ message: 'That teammate is not in your workspace.' });
+        return;
       }
 
-      await users.updateLabels({ userId: req.params.id, labels: makeAdmin ? [ADMIN_LABEL] : [] });
-      usersCache.clear();
+      const targetIsCurrentlyAdmin = membership.roles.includes(ADMIN_ROLE);
+      if (!makeAdmin && targetIsCurrentlyAdmin && (await countAdmins(teams, workspace.teamId)) <= 1) {
+        res.status(400).json({ message: 'The workspace needs at least one admin.' });
+        return;
+      }
+
+      await teams.updateMembership({ teamId: workspace.teamId, membershipId: membership.$id, roles: [makeAdmin ? ADMIN_ROLE : MEMBER_ROLE] });
+      usersCache.clear(workspace.teamId);
       res.json({ success: true });
     } catch (error) {
       res.status(errorStatus(error)).json({
-        message: error instanceof Error ? error.message : 'Could not update that teammate\'s role.',
+        message: error instanceof Error ? error.message : "Could not update that teammate's role.",
       });
     }
   });
