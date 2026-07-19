@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FormField, form, maxLengthError, requiredError, validate } from '@angular/forms/signals';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonDirective, ButtonIcon, ButtonLabel } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { Fluid } from 'primeng/fluid';
@@ -11,7 +11,7 @@ import { Message } from 'primeng/message';
 import { PasswordDirective } from 'primeng/password';
 import { Select } from 'primeng/select';
 import { Skeleton } from 'primeng/skeleton';
-import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
+import { TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { Tag } from 'primeng/tag';
 import { Textarea } from 'primeng/textarea';
 import { Auth, UserSession } from '../../auth/auth';
@@ -57,8 +57,6 @@ function locationLabelOf(session: UserSession): string {
     PasswordDirective,
     Select,
     Skeleton,
-    Tab,
-    TabList,
     TabPanel,
     TabPanels,
     Tabs,
@@ -76,8 +74,16 @@ export class Settings {
   protected readonly auth = inject(Auth);
   private readonly notifications = inject(Notifications);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  protected readonly activeTab = signal<string | number | undefined>('general');
+  private static readonly VALID_TABS = ['general', 'billing', 'security', 'danger'];
+
+  protected readonly activeTab = signal<string | number | undefined>(this.initialTab());
+
+  private initialTab(): string {
+    const requested = this.route.snapshot.queryParamMap.get('tab');
+    return requested && Settings.VALID_TABS.includes(requested) ? requested : 'general';
+  }
   protected readonly timezoneOptions = TIMEZONES.map((timezone) => ({
     label: timezone.replace(/_/g, ' '),
     value: timezone,

@@ -1,21 +1,46 @@
-<div class="mx-auto max-w-4xl space-y-6">
-  <div>
-    <h2 class="text-xl font-semibold tracking-tight text-slate-900">Settings</h2>
-    <p class="mt-1 text-sm text-slate-500">Manage your workspace, security, and account.</p>
-  </div>
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-col gap-8 lg:flex-row lg:items-start">
+    <div class="lg:w-64 lg:flex-none">
+      <h2 class="text-xl font-semibold tracking-tight text-slate-900">Settings</h2>
+      <p class="mt-1 text-sm text-slate-500">Manage your workspace, security, and account.</p>
 
-  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event)">
-    <p-tablist>
-      <p-tab value="general"><i class="pi pi-sliders-h mr-2" aria-hidden="true"></i>General</p-tab>
-      <p-tab value="billing"><i class="pi pi-credit-card mr-2" aria-hidden="true"></i>Billing</p-tab>
-      <p-tab value="security"><i class="pi pi-shield mr-2" aria-hidden="true"></i>Security</p-tab>
-      <p-tab value="danger"><i class="pi pi-exclamation-triangle mr-2" aria-hidden="true"></i>Danger zone</p-tab>
-    </p-tablist>
+      <nav class="mt-6 flex gap-1 overflow-x-auto lg:mt-8 lg:flex-col lg:overflow-visible" aria-label="Settings sections">
+        <button type="button"
+          class="flex flex-none items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:flex-auto"
+          [class]="activeTab() === 'general' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+          [attr.aria-current]="activeTab() === 'general' ? 'page' : null" (click)="activeTab.set('general')">
+          <i class="pi pi-sliders-h flex-none" aria-hidden="true"></i>
+          General
+        </button>
+        <button type="button"
+          class="flex flex-none items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:flex-auto"
+          [class]="activeTab() === 'billing' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+          [attr.aria-current]="activeTab() === 'billing' ? 'page' : null" (click)="activeTab.set('billing')">
+          <i class="pi pi-credit-card flex-none" aria-hidden="true"></i>
+          Billing
+        </button>
+        <button type="button"
+          class="flex flex-none items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:flex-auto"
+          [class]="activeTab() === 'security' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+          [attr.aria-current]="activeTab() === 'security' ? 'page' : null" (click)="activeTab.set('security')">
+          <i class="pi pi-shield flex-none" aria-hidden="true"></i>
+          Security
+        </button>
+        <button type="button"
+          class="flex flex-none items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors lg:flex-auto"
+          [class]="activeTab() === 'danger' ? 'bg-rose-50 text-rose-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+          [attr.aria-current]="activeTab() === 'danger' ? 'page' : null" (click)="activeTab.set('danger')">
+          <i class="pi pi-exclamation-triangle flex-none" aria-hidden="true"></i>
+          Danger zone
+        </button>
+      </nav>
+    </div>
 
-    <p-tabpanels>
-      <p-tabpanel value="general">
-        <div class="pt-6">
-          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div class="min-w-0 flex-1">
+      <p-tabs [value]="activeTab()">
+        <p-tabpanels>
+          <p-tabpanel value="general">
+            <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div class="border-b border-slate-100 px-6 py-5 sm:px-8">
               <h3 class="text-base font-semibold tracking-tight text-slate-900">Workspace details</h3>
               <p class="mt-1 text-sm text-slate-500">These details are visible to everyone in your workspace.</p>
@@ -98,13 +123,11 @@
                 </button>
               </div>
             </form>
-          </section>
-        </div>
-      </p-tabpanel>
+            </section>
+          </p-tabpanel>
 
-      <p-tabpanel value="billing">
-        <div class="pt-6">
-          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <p-tabpanel value="billing">
+            <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div class="border-b border-slate-100 px-6 py-5 sm:px-8">
               <h3 class="text-base font-semibold tracking-tight text-slate-900">Plan &amp; billing</h3>
               <p class="mt-1 text-sm text-slate-500">Manage your workspace's subscription and usage.</p>
@@ -174,16 +197,14 @@
                 </div>
               </div>
             }
-          </section>
-        </div>
-      </p-tabpanel>
+            </section>
+          </p-tabpanel>
 
-      <p-tabpanel value="security">
-        <div class="pt-6">
-          <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div class="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div>
-                <h3 class="text-base font-semibold tracking-tight text-slate-900">Active sessions</h3>
+          <p-tabpanel value="security">
+            <section class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div class="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                <div>
+                  <h3 class="text-base font-semibold tracking-tight text-slate-900">Active sessions</h3>
                 <p class="mt-1 text-sm text-slate-500">Devices currently signed in to your account.</p>
               </div>
               @if (hasOtherSessions()) {
@@ -247,34 +268,33 @@
                 </ul>
               }
             </div>
-          </section>
-        </div>
-      </p-tabpanel>
+            </section>
+          </p-tabpanel>
 
-      <p-tabpanel value="danger">
-        <div class="pt-6">
-          <section class="overflow-hidden rounded-xl border border-rose-200 bg-white">
-            <div class="border-b border-rose-100 bg-rose-50/50 px-6 py-5 sm:px-8">
-              <h3 class="text-base font-semibold tracking-tight text-rose-900">Danger zone</h3>
-              <p class="mt-1 text-sm text-rose-700">Irreversible and destructive actions.</p>
-            </div>
-            <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-              <div class="max-w-md">
-                <p class="text-sm font-medium text-slate-900">Delete account</p>
-                <p class="mt-1 text-sm text-slate-500">
-                  Permanently delete your account and remove your access to this workspace. This cannot be undone.
-                </p>
+          <p-tabpanel value="danger">
+            <section class="overflow-hidden rounded-xl border border-rose-200 bg-white">
+              <div class="border-b border-rose-100 bg-rose-50/50 px-6 py-5 sm:px-8">
+                <h3 class="text-base font-semibold tracking-tight text-rose-900">Danger zone</h3>
+                <p class="mt-1 text-sm text-rose-700">Irreversible and destructive actions.</p>
               </div>
-              <button pButton type="button" severity="danger" class="flex-none" (click)="openDeleteDialog()">
-                <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
-                <span pButtonLabel>Delete my account</span>
-              </button>
-            </div>
-          </section>
-        </div>
-      </p-tabpanel>
-    </p-tabpanels>
-  </p-tabs>
+              <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                <div class="max-w-md">
+                  <p class="text-sm font-medium text-slate-900">Delete account</p>
+                  <p class="mt-1 text-sm text-slate-500">
+                    Permanently delete your account and remove your access to this workspace. This cannot be undone.
+                  </p>
+                </div>
+                <button pButton type="button" severity="danger" class="flex-none" (click)="openDeleteDialog()">
+                  <i class="pi pi-trash" pButtonIcon aria-hidden="true"></i>
+                  <span pButtonLabel>Delete my account</span>
+                </button>
+              </div>
+            </section>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
+    </div>
+  </div>
 </div>
 
 <p-dialog [visible]="deleteDialogVisible()" (visibleChange)="!$event && closeDeleteDialog()" [modal]="true"
