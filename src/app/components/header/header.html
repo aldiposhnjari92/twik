@@ -18,7 +18,56 @@
     {{ title() }}
   </h1>
 
-  <div class="ml-auto flex items-center">
+  <div class="ml-auto flex items-center gap-1">
+    <button
+      type="button"
+      class="relative flex h-9 w-9 flex-none items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+      aria-haspopup="true"
+      [attr.aria-label]="
+        deadlineAlerts.totalCount() > 0
+          ? 'Notifications, ' + deadlineAlerts.totalCount() + (deadlineAlerts.overdueCount() > 0 ? ' overdue' : ' due soon')
+          : 'Notifications'
+      "
+      (click)="alertsPanel.toggle($event)"
+    >
+      <i class="pi pi-bell text-lg" aria-hidden="true"></i>
+      @if (deadlineAlerts.totalCount() > 0) {
+        <span
+          class="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
+          [class]="deadlineAlerts.overdueCount() > 0 ? 'bg-red-600' : 'bg-amber-500'"
+        >
+          {{ deadlineAlerts.totalCount() }}
+        </span>
+      }
+    </button>
+    <p-popover #alertsPanel appendTo="body">
+      <div class="w-80">
+        <div class="border-b border-slate-100 px-4 py-3">
+          <p class="text-sm font-semibold text-slate-900">Deadline alerts</p>
+        </div>
+        @if (deadlineAlerts.totalCount() === 0) {
+          <div class="flex items-center gap-2.5 px-4 py-6 text-sm text-slate-500">
+            <i class="pi pi-check-circle text-emerald-500" aria-hidden="true"></i>
+            You're all caught up.
+          </div>
+        } @else {
+          <ul class="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            @for (alert of deadlineAlerts.alerts(); track alert.id) {
+              <li>
+                <a
+                  [routerLink]="['/projects', alert.id, 'edit']"
+                  (click)="alertsPanel.hide()"
+                  class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                >
+                  <span class="truncate text-sm font-medium text-slate-900">{{ alert.name }}</span>
+                  <p-tag [value]="alertLabel(alert.daysRemaining)" [severity]="alert.urgency === 'critical' ? 'danger' : 'warn'" class="flex-none" />
+                </a>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </p-popover>
     <button
       type="button"
       class="flex items-center gap-2 rounded-full py-1 pr-2 pl-1 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
